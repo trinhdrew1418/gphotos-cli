@@ -17,6 +17,7 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/trinhdrew1418/gphotos-cli/utils/filetypes"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -62,12 +63,15 @@ var pushCmd = &cobra.Command{
 
 		//TODO: distinguish from folder and otherwise
 		case len(args) > 1:
-			for _, s := range args {
-				filenames = append(filenames, s)
+			for _, file := range args {
+				if filetypes.IsImage(file) {
+					filenames = append(filenames, file)
+				}
 			}
-			//TODO: verify the files + the proper extension
-		case args[0] == "*": // get all the pictures in the current folder
-			break
+			fmt.Println("Uploading the following files: ")
+			for _, filename := range filenames {
+				fmt.Println(filename)
+			}
 		default:
 			filenames = append(filenames, args[0])
 			//TODO: verify the files + the proper extension
@@ -90,8 +94,6 @@ func pushFiles(srv *photoslib.Service, client *http.Client, filenames []string, 
 		mediaItems[i] = &newMediaItem
 	}
 
-	fmt.Println(mediaItems[0].Description, mediaItems[1].Description)
-
 	resp, err := srv.MediaItems.BatchCreate(&photoslib.BatchCreateMediaItemsRequest{
 		NewMediaItems: mediaItems,
 	}).Do()
@@ -100,6 +102,8 @@ func pushFiles(srv *photoslib.Service, client *http.Client, filenames []string, 
 		for _, result := range resp.NewMediaItemResults {
 			fmt.Println(result.Status.Message)
 		}
+	} else {
+		log.Fatalf("Did not create %v", err)
 	}
 }
 

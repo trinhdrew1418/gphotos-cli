@@ -15,12 +15,13 @@
 package cmd
 
 import (
-	"fmt"
 	"encoding/json"
-	"os"
-	"log"
+	"fmt"
 	"io/ioutil"
+	"log"
 	"net/http"
+	"os"
+	"sync"
 
 	"github.com/spf13/cobra"
 	"golang.org/x/net/context"
@@ -31,46 +32,46 @@ import (
 const apiVer = "v1"
 const basePath = "https://photoslibrary.googleapis.com/"
 
+type UploadInfo struct {
+	token    string
+	filename string
+}
+
 // pushCmd represents the push command
 var pushCmd = &cobra.Command{
 	Use:   "push",
 	Short: "Upload files",
-	Long: "TODO",
+	Long:  "TODO",
 	Run: func(cmd *cobra.Command, args []string) {
 		config := getConfig()
-
-		tokFile := "token.json"
-		tok, err := tokenFromFile(tokFile)
-		if err != nil {
-			log.Fatalf("token not cached: %v", err)
-		}
-
+		tok := loadToken()
 		client := config.Client(context.Background(), tok)
-		gphotoServ, err := photoslib.New(client) 
+		gphotoServ, err := photoslib.New(client)
 		if err != nil {
 			log.Fatalf("Unable to retrieve google photos client: %v", err)
 		}
 
-		push(gphotoServ, client)
+		filenames := []string{"test1.png", "test2.png"}
+
+		pushFiles(gphotoServ, client, filenames)
 	},
 }
 
-func push(srv *photoslib.Service, client *http.Client) {
-	filename := "test.png"
+func pushFiles(srv *photoslib.Service, client *http.Client, filenames []string, albumID ...string) {
+	tokens := getUploadTokens(client, filenames)
+	mediaItems := make([]*photoslib.NewMediaItem, len(filenames))
 
-	token, err := getUploadToken(client, filename)
-	if err != nil {
-		log.Fatalf("something is fucked %v", err)
+	for i := 0; i < len(filenames); i++ {
+		mediaItems[i] = &photoslib.NewMediaItem{
+			Description:     tokens[i].filename,
+			SimpleMediaItem: &photoslib.SimpleMediaItem{UploadToken: tokens[i].token},
+		}
 	}
 
+	fmt.Println(mediaItems)
+
 	resp, err := srv.MediaItems.BatchCreate(&photoslib.BatchCreateMediaItemsRequest{
-		AlbumId: "",
-		NewMediaItems: []*photoslib.NewMediaItem{
-			&photoslib.NewMediaItem{
-				Description: filename,
-				SimpleMediaItem: &photoslib.SimpleMediaItem{UploadToken: token},
-			},
-		},
+		NewMediaItems: mediaItems,
 	}).Do()
 
 	if err == nil {
@@ -78,8 +79,52 @@ func push(srv *photoslib.Service, client *http.Client) {
 	}
 }
 
+func getUploadTokens(client *http.Client, filenames []string) []UploadInfo {
+	tokens := make([]UploadInfo, 0)
+	tokenQueue := make(chan UploadInfo)
+
+	var wg sync.WaitGroup
+
+	wg.Add(1)
+	go processTokens(client, &filenames, &wg, tokenQueue)
+	wg.Add(1)
+	go collectTokens(&wg, tokenQueue, &tokens)
+	wg.Wait()
+
+	return tokens
+}
+
+func processTokens(client *http.Client, filenames *[]string, wg *sync.WaitGroup, tokenQueue chan UploadInfo) {
+	defer wg.Done()
+	defer close(tokenQueue)
+
+	var w sync.WaitGroup
+	for _, filename := range *filenames {
+		w.Add(1)
+		go func() {
+			tok, err := getToken(client, filename)
+			if err != nil {
+				log.Fatalf("unable to make POST request")
+			}
+			tokenQueue <- UploadInfo{tok, filename}
+			w.Done()
+		}()
+	}
+	w.Wait()
+}
+
+func collectTokens(wg *sync.WaitGroup, tokenQueue chan UploadInfo, tokens *[]UploadInfo) {
+	defer wg.Done()
+	count := 1
+	for s := range tokenQueue {
+		*tokens = append(*tokens, s)
+		fmt.Println("Uploaded  " + string(count))
+		count += 1
+	}
+}
+
 // get upload token
-func getUploadToken(client *http.Client, filename string) (token string, err error) {
+func getToken(client *http.Client, filename string) (token string, err error) {
 	file, err := os.Open(filename)
 	if err != nil {
 		log.Fatalf("Cannot open a file %v", err)
@@ -102,7 +147,7 @@ func getUploadToken(client *http.Client, filename string) (token string, err err
 	defer resp.Body.Close()
 
 	b, err := ioutil.ReadAll(resp.Body)
-	
+
 	uploadToken := string(b)
 
 	return uploadToken, err
@@ -122,8 +167,15 @@ func tokenFromFile(file string) (*oauth2.Token, error) {
 	return tok, err
 }
 
+func loadToken() *oauth2.Token {
+	tokFile := "token.json"
+	tok, err := tokenFromFile(tokFile)
+	if err != nil {
+		log.Fatalf("token not cached: %v", err)
+	}
 
-
+	return tok
+}
 
 func init() {
 	rootCmd.AddCommand(pushCmd)

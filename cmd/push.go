@@ -43,6 +43,12 @@ var pushCmd = &cobra.Command{
 	Short: "Upload files",
 	Long:  "TODO",
 	Run: func(cmd *cobra.Command, args []string) {
+		// TODO display some help shit (same message as Long preferably)
+		if len(args) < 1 {
+			fmt.Println("Please give an argument")
+			return
+		}
+
 		config := getConfig()
 		tok := loadToken()
 		client := config.Client(context.Background(), tok)
@@ -51,7 +57,21 @@ var pushCmd = &cobra.Command{
 			log.Fatalf("Unable to retrieve google photos client: %v", err)
 		}
 
-		filenames := []string{"test1.png", "test2.png"}
+		var filenames []string
+		switch {
+
+		//TODO: distinguish from folder and otherwise
+		case len(args) > 1:
+			for _, s := range args {
+				filenames = append(filenames, s)
+			}
+			//TODO: verify the files + the proper extension
+		case args[0] == "*": // get all the pictures in the current folder
+			break
+		default:
+			filenames = append(filenames, args[0])
+			//TODO: verify the files + the proper extension
+		}
 
 		pushFiles(gphotoServ, client, filenames)
 	},
@@ -62,20 +82,24 @@ func pushFiles(srv *photoslib.Service, client *http.Client, filenames []string, 
 	mediaItems := make([]*photoslib.NewMediaItem, len(filenames))
 
 	for i := 0; i < len(filenames); i++ {
-		mediaItems[i] = &photoslib.NewMediaItem{
+		println(tokens[i].filename)
+		newMediaItem := photoslib.NewMediaItem{
 			Description:     tokens[i].filename,
 			SimpleMediaItem: &photoslib.SimpleMediaItem{UploadToken: tokens[i].token},
 		}
+		mediaItems[i] = &newMediaItem
 	}
 
-	fmt.Println(mediaItems)
+	fmt.Println(mediaItems[0].Description, mediaItems[1].Description)
 
 	resp, err := srv.MediaItems.BatchCreate(&photoslib.BatchCreateMediaItemsRequest{
 		NewMediaItems: mediaItems,
 	}).Do()
 
 	if err == nil {
-		fmt.Println(resp.NewMediaItemResults[0].Status.Message)
+		for _, result := range resp.NewMediaItemResults {
+			fmt.Println(result.Status.Message)
+		}
 	}
 }
 
@@ -101,25 +125,23 @@ func processTokens(client *http.Client, filenames *[]string, wg *sync.WaitGroup,
 	var w sync.WaitGroup
 	for _, filename := range *filenames {
 		w.Add(1)
-		go func() {
-			tok, err := getToken(client, filename)
-			if err != nil {
-				log.Fatalf("unable to make POST request")
-			}
-			tokenQueue <- UploadInfo{tok, filename}
-			w.Done()
-		}()
+		go channelTok(client, filename, &w, tokenQueue)
 	}
 	w.Wait()
 }
-
+func channelTok(client *http.Client, filename string, w *sync.WaitGroup, tokenQueue chan UploadInfo) {
+	tok, err := getToken(client, filename)
+	if err != nil {
+		log.Fatalf("unable to make POST request")
+	}
+	w.Done()
+	tokenQueue <- UploadInfo{tok, filename}
+}
 func collectTokens(wg *sync.WaitGroup, tokenQueue chan UploadInfo, tokens *[]UploadInfo) {
 	defer wg.Done()
-	count := 1
 	for s := range tokenQueue {
+		println(s.filename)
 		*tokens = append(*tokens, s)
-		fmt.Println("Uploaded  " + string(count))
-		count += 1
 	}
 }
 
@@ -147,6 +169,9 @@ func getToken(client *http.Client, filename string) (token string, err error) {
 	defer resp.Body.Close()
 
 	b, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		log.Fatal("upload tok error %v", err)
+	}
 
 	uploadToken := string(b)
 

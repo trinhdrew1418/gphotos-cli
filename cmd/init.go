@@ -24,6 +24,7 @@ import (
 	photoslib "google.golang.org/api/photoslibrary/v1"
 	"io/ioutil"
 	"log"
+	"net/http"
 	"os"
 )
 
@@ -118,6 +119,20 @@ func loadToken() *oauth2.Token {
 	}
 
 	return tok
+}
+
+func getClientService(scope string) (*http.Client, *photoslib.Service) {
+	config := getConfig(photoslib.PhotoslibraryScope)
+	tok := loadToken()
+
+	client := config.Client(context.Background(), tok)
+	gphotoServ, err := photoslib.New(client)
+
+	if err != nil {
+		log.Fatalf("Unable to retrieve google photos service: %v", err)
+	}
+
+	return client, gphotoServ
 }
 
 func init() {

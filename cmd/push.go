@@ -72,13 +72,13 @@ var pushCmd = &cobra.Command{
 		client := config.Client(context.Background(), newTok)
 		gphotoServ, err := photoslib.New(client)
 		if err != nil {
-			log.Fatalf("Unable to retrieve google photos client: %v", err)
+			log.Fatalf("Unable to retrieve google photos service: %v", err)
 		}
 
 		if selectAlbum {
 			albumMap := *retrievers.GetAlbumsMap(gphotoServ)
 
-			if len(albumMap) > 1 {
+			if len(albumMap) >= 1 {
 				titles := make([]string, len(albumMap))
 				i := 0
 				for k := range albumMap {

@@ -16,8 +16,10 @@ package cmd
 
 import (
 	"fmt"
+	"github.com/manifoldco/promptui"
 	"github.com/trinhdrew1418/gphotos-cli/utils/expobackoff"
 	"github.com/trinhdrew1418/gphotos-cli/utils/filetypes"
+	"github.com/trinhdrew1418/gphotos-cli/utils/retrievers"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -45,6 +47,8 @@ var pushCmd = &cobra.Command{
 	Short: "Upload files",
 	Long:  "TODO",
 	Run: func(cmd *cobra.Command, args []string) {
+
+		println("This is the value of album ", workingAlbum)
 		// TODO display some help shit (same message as Long preferably)
 		if len(args) < 1 {
 			fmt.Println("Please give an argument")
@@ -54,6 +58,7 @@ var pushCmd = &cobra.Command{
 		config := getConfig()
 		tok := loadToken()
 		newTok, err := config.TokenSource(context.TODO(), tok).Token()
+
 		if err != nil {
 			log.Fatalln(err)
 		}
@@ -68,6 +73,30 @@ var pushCmd = &cobra.Command{
 		gphotoServ, err := photoslib.New(client)
 		if err != nil {
 			log.Fatalf("Unable to retrieve google photos client: %v", err)
+		}
+
+		if selectAlbum {
+			albumMap := *retrievers.GetAlbumsMap(gphotoServ)
+			titles := make([]string, len(albumMap))
+			i := 0
+			for k := range albumMap {
+				titles[i] = k
+				i++
+			}
+
+			prompt := promptui.Select{
+				Label: "Select album",
+				Items: titles,
+			}
+
+			_, album, err := prompt.Run()
+
+			if err != nil {
+				log.Fatalln(err)
+			}
+
+			workingAlbum = albumMap[album]
+			print(workingAlbum, album)
 		}
 
 		var filenames []string
@@ -135,6 +164,7 @@ func createMedia(srv *photoslib.Service, wg *sync.WaitGroup, tokenQueue chan Upl
 			for _, sleepDur := range durations {
 				time.Sleep(sleepDur)
 				resp, err = srv.MediaItems.BatchCreate(&photoslib.BatchCreateMediaItemsRequest{
+					AlbumId:       workingAlbum,
 					NewMediaItems: mediaItems}).Do()
 
 				if resp != nil && resp.HTTPStatusCode == 200 {

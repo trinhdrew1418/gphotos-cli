@@ -79,7 +79,7 @@ func getConfig() *oauth2.Config {
 
 // get the token from the web
 func getTokenFromWeb(config *oauth2.Config) *oauth2.Token {
-	authURL := config.AuthCodeURL("state-token", oauth2.AccessTypeOnline)
+	authURL := config.AuthCodeURL("state-token", oauth2.AccessTypeOffline)
 	fmt.Printf("Go to the following link in your browser and paste the authorization"+
 		"code: \n%v\n", authURL)
 

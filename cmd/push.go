@@ -159,6 +159,7 @@ func createMedia(srv *photoslib.Service, wg *sync.WaitGroup, tokenQueue chan Upl
 		mediaItems := []*photoslib.NewMediaItem{&newMediaItem}
 
 		resp, err := srv.MediaItems.BatchCreate(&photoslib.BatchCreateMediaItemsRequest{
+			AlbumId:       workingAlbum,
 			NewMediaItems: mediaItems}).Do()
 
 		if resp != nil && resp.HTTPStatusCode == 429 {

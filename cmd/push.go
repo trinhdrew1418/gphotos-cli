@@ -15,23 +15,24 @@
 package cmd
 
 import (
-	"encoding/json"
 	"fmt"
+	"github.com/trinhdrew1418/gphotos-cli/utils/expobackoff"
 	"github.com/trinhdrew1418/gphotos-cli/utils/filetypes"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
 	"sync"
+	"time"
 
 	"github.com/spf13/cobra"
 	"golang.org/x/net/context"
-	"golang.org/x/oauth2"
 	photoslib "google.golang.org/api/photoslibrary/v1"
 )
 
 const apiVer = "v1"
 const basePath = "https://photoslibrary.googleapis.com/"
+const MAX_WORKERS = 5
 
 type UploadInfo struct {
 	token    string
@@ -52,29 +53,34 @@ var pushCmd = &cobra.Command{
 
 		config := getConfig()
 		tok := loadToken()
-		client := config.Client(context.Background(), tok)
+		newTok, err := config.TokenSource(context.TODO(), tok).Token()
+		if err != nil {
+			log.Fatalln(err)
+		}
+
+		if newTok.AccessToken != tok.AccessToken {
+			fmt.Println("Token refreshed")
+			saveToken(newTok)
+			tok = newTok
+		}
+
+		client := config.Client(context.Background(), newTok)
 		gphotoServ, err := photoslib.New(client)
 		if err != nil {
 			log.Fatalf("Unable to retrieve google photos client: %v", err)
 		}
 
 		var filenames []string
-		switch {
 
-		//TODO: distinguish from folder and otherwise
-		case len(args) > 1:
-			for _, file := range args {
-				if filetypes.IsImage(file) {
-					filenames = append(filenames, file)
-				}
+		for _, file := range args {
+			if filetypes.IsImage(file) {
+				filenames = append(filenames, file)
 			}
-			fmt.Println("Uploading the following files: ")
-			for _, filename := range filenames {
-				fmt.Println(filename)
-			}
-		default:
-			filenames = append(filenames, args[0])
-			//TODO: verify the files + the proper extension
+		}
+
+		fmt.Println("Uploading the following files: ")
+		for _, filename := range filenames {
+			fmt.Println(filename)
 		}
 
 		pushFiles(gphotoServ, client, filenames)
@@ -88,7 +94,6 @@ func pushFiles(srv *photoslib.Service, client *http.Client, filenames []string, 
 	for i := 0; i < len(filenames); i++ {
 		println(tokens[i].filename)
 		newMediaItem := photoslib.NewMediaItem{
-			Description:     tokens[i].filename,
 			SimpleMediaItem: &photoslib.SimpleMediaItem{UploadToken: tokens[i].token},
 		}
 		mediaItems[i] = &newMediaItem
@@ -97,6 +102,20 @@ func pushFiles(srv *photoslib.Service, client *http.Client, filenames []string, 
 	resp, err := srv.MediaItems.BatchCreate(&photoslib.BatchCreateMediaItemsRequest{
 		NewMediaItems: mediaItems,
 	}).Do()
+
+	// TODO: check for other possible HTTP response errors
+	if resp.HTTPStatusCode == 429 {
+		durations := expobackoff.Calculate(expobackoff.NUM_RETRIES)
+		for _, sleepDur := range durations {
+			time.Sleep(sleepDur)
+			resp, err = srv.MediaItems.BatchCreate(&photoslib.BatchCreateMediaItemsRequest{
+				NewMediaItems: mediaItems}).Do()
+
+			if resp.HTTPStatusCode == 200 {
+				break
+			}
+		}
+	}
 
 	if err == nil {
 		for _, result := range resp.NewMediaItemResults {
@@ -114,7 +133,7 @@ func getUploadTokens(client *http.Client, filenames []string) []UploadInfo {
 	var wg sync.WaitGroup
 
 	wg.Add(1)
-	go processTokens(client, &filenames, &wg, tokenQueue)
+	go requestUploadTokens(client, &filenames, &wg, tokenQueue)
 	wg.Add(1)
 	go collectTokens(&wg, tokenQueue, &tokens)
 	wg.Wait()
@@ -122,25 +141,39 @@ func getUploadTokens(client *http.Client, filenames []string) []UploadInfo {
 	return tokens
 }
 
-func processTokens(client *http.Client, filenames *[]string, wg *sync.WaitGroup, tokenQueue chan UploadInfo) {
+func uploader(uploadTasks chan string, tokenQueue chan UploadInfo, client *http.Client, w *sync.WaitGroup) {
+	for filename := range uploadTasks {
+		tok, err := getUploadToken(client, filename)
+		if err != nil {
+			log.Fatalf("unable to make POST request")
+		}
+		if tok != "" {
+			tokenQueue <- UploadInfo{tok, filename}
+		}
+	}
+	w.Done()
+}
+
+func requestUploadTokens(client *http.Client, filenames *[]string, wg *sync.WaitGroup, tokenQueue chan UploadInfo) {
 	defer wg.Done()
 	defer close(tokenQueue)
 
 	var w sync.WaitGroup
-	for _, filename := range *filenames {
+	uploadTasks := make(chan string)
+
+	for i := 0; i < MAX_WORKERS; i++ {
 		w.Add(1)
-		go channelTok(client, filename, &w, tokenQueue)
+		go uploader(uploadTasks, tokenQueue, client, &w)
 	}
+
+	for _, filename := range *filenames {
+		uploadTasks <- filename
+	}
+	close(uploadTasks)
+
 	w.Wait()
 }
-func channelTok(client *http.Client, filename string, w *sync.WaitGroup, tokenQueue chan UploadInfo) {
-	tok, err := getToken(client, filename)
-	if err != nil {
-		log.Fatalf("unable to make POST request")
-	}
-	w.Done()
-	tokenQueue <- UploadInfo{tok, filename}
-}
+
 func collectTokens(wg *sync.WaitGroup, tokenQueue chan UploadInfo, tokens *[]UploadInfo) {
 	defer wg.Done()
 	for s := range tokenQueue {
@@ -150,7 +183,7 @@ func collectTokens(wg *sync.WaitGroup, tokenQueue chan UploadInfo, tokens *[]Upl
 }
 
 // get upload token
-func getToken(client *http.Client, filename string) (token string, err error) {
+func getUploadToken(client *http.Client, filename string) (token string, err error) {
 	file, err := os.Open(filename)
 	if err != nil {
 		log.Fatalf("Cannot open a file %v", err)
@@ -165,45 +198,27 @@ func getToken(client *http.Client, filename string) (token string, err error) {
 	req.Header.Add("X-Goog-Upload-File-Name", filename)
 	req.Header.Set("X-Goog-Upload-Protocol", "raw")
 
-	resp, err := client.Do(req)
+	resp, err := expobackoff.RequestUntilSuccess(client.Do, req)
+
 	if err != nil {
-		log.Fatalf("fucked up making http request %v", err)
+		log.Fatalln(err)
+	}
+
+	if resp.StatusCode != 200 {
+		println(filename + " failed to upload")
+		return "", nil
 	}
 
 	defer resp.Body.Close()
 
 	b, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		log.Fatal("upload tok error %v", err)
+		log.Fatalln(err)
 	}
 
 	uploadToken := string(b)
 
 	return uploadToken, err
-}
-
-// obtains cached token
-func tokenFromFile(file string) (*oauth2.Token, error) {
-	f, err := os.Open(file)
-	if err != nil {
-		return nil, err
-	}
-
-	defer f.Close()
-	tok := &oauth2.Token{}
-	err = json.NewDecoder(f).Decode(tok)
-
-	return tok, err
-}
-
-func loadToken() *oauth2.Token {
-	tokFile := "token.json"
-	tok, err := tokenFromFile(tokFile)
-	if err != nil {
-		log.Fatalf("token not cached: %v", err)
-	}
-
-	return tok
 }
 
 func init() {

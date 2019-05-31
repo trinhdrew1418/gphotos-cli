@@ -15,24 +15,28 @@
 package cmd
 
 import (
-	"fmt"
 	"encoding/json"
-	"os"
-	"log"
-	"io/ioutil"
-
+	"fmt"
 	"github.com/spf13/cobra"
 	"golang.org/x/net/context"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	photoslib "google.golang.org/api/photoslibrary/v1"
+	"io/ioutil"
+	"log"
+	"os"
+)
+
+const (
+	credentialFile = "/src/github.com/trinhdrew1418/gphotos-cli/auth/client_id.json"
+	tokenFile      = "/src/github.com/trinhdrew1418/gphotos-cli/auth/token.json"
 )
 
 // initCmd represents the init command
 var initCmd = &cobra.Command{
 	Use:   "init",
 	Short: "store token",
-	Long: "TODO",
+	Long:  "TODO",
 
 	// this function obtains the token and saves it
 	Run: func(cmd *cobra.Command, args []string) {
@@ -43,14 +47,13 @@ var initCmd = &cobra.Command{
 		tok := getTokenFromWeb(config)
 
 		// save the token into a file
-		tokFile := "token.json"
-		saveToken(tokFile, tok)
+		saveToken(tok)
 	},
 }
 
-func saveToken(path string, token *oauth2.Token) {
-	fmt.Printf("Saving credential file")
-	f, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600)
+func saveToken(token *oauth2.Token) {
+	fmt.Println("Saving token file")
+	f, err := os.OpenFile(os.Getenv("GOPATH")+tokenFile, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600)
 	if err != nil {
 		log.Fatalf("Unable to cache oauth token: %v", err)
 	}
@@ -61,7 +64,7 @@ func saveToken(path string, token *oauth2.Token) {
 
 // make config
 func getConfig() *oauth2.Config {
-	b, err := ioutil.ReadFile("client_id.json")
+	b, err := ioutil.ReadFile(os.Getenv("GOPATH") + credentialFile)
 	if err != nil {
 		log.Fatalf("unable to read client credentials %v", err)
 	}
@@ -77,8 +80,8 @@ func getConfig() *oauth2.Config {
 // get the token from the web
 func getTokenFromWeb(config *oauth2.Config) *oauth2.Token {
 	authURL := config.AuthCodeURL("state-token", oauth2.AccessTypeOnline)
-	fmt.Printf("Go to the following link in your browser and paste the authorization" +
-				"code: \n%v\n", authURL)
+	fmt.Printf("Go to the following link in your browser and paste the authorization"+
+		"code: \n%v\n", authURL)
 
 	var authCode string
 	if _, err := fmt.Scan(&authCode); err != nil {
@@ -86,10 +89,34 @@ func getTokenFromWeb(config *oauth2.Config) *oauth2.Token {
 	}
 
 	tok, err := config.Exchange(context.TODO(), authCode)
+
 	if err != nil {
 		log.Fatalf("Unable to retrieve token from the web %v", err)
 	}
-	
+
+	return tok
+}
+
+// obtains cached token
+func tokenFromFile(file string) (*oauth2.Token, error) {
+	f, err := os.Open(file)
+	if err != nil {
+		return nil, err
+	}
+
+	defer f.Close()
+	tok := &oauth2.Token{}
+	err = json.NewDecoder(f).Decode(tok)
+
+	return tok, err
+}
+
+func loadToken() *oauth2.Token {
+	tok, err := tokenFromFile(os.Getenv("GOPATH") + tokenFile)
+	if err != nil {
+		log.Fatalf("token not cached: %v", err)
+	}
+
 	return tok
 }
 

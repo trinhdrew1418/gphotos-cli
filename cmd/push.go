@@ -47,9 +47,7 @@ var pushCmd = &cobra.Command{
 	Short: "Upload files",
 	Long:  "TODO",
 	Run: func(cmd *cobra.Command, args []string) {
-
-		println("This is the value of album ", workingAlbum)
-		// TODO display some help shit (same message as Long preferably)
+		//TODO: display some help shit (same message as Long preferably)
 		if len(args) < 1 {
 			fmt.Println("Please give an argument")
 			return
@@ -75,6 +73,7 @@ var pushCmd = &cobra.Command{
 			log.Fatalf("Unable to retrieve google photos service: %v", err)
 		}
 
+		var album string
 		if selectAlbum {
 			albumMap := *retrievers.GetAlbumsMap(gphotoServ)
 
@@ -90,7 +89,7 @@ var pushCmd = &cobra.Command{
 					Items: titles,
 				}
 
-				_, album, err := prompt.Run()
+				_, album, err = prompt.Run()
 
 				if err != nil {
 					log.Fatalln(err)
@@ -109,9 +108,13 @@ var pushCmd = &cobra.Command{
 			}
 		}
 
-		fmt.Println("Uploading the following files: ")
+		if workingAlbum != "" {
+			fmt.Println("Uploading the following files to " + album + ":")
+		} else {
+			fmt.Println("Uploading the following files:")
+		}
 		for _, filename := range filenames {
-			fmt.Println(filename)
+			fmt.Println("-", filename)
 		}
 
 		pushFiles(gphotoServ, client, filenames)

@@ -41,7 +41,7 @@ var initCmd = &cobra.Command{
 	// this function obtains the token and saves it
 	Run: func(cmd *cobra.Command, args []string) {
 		// get the config
-		config := getConfig()
+		config := getConfig(photoslib.PhotoslibraryScope)
 
 		// use the config to the get the token
 		tok := getTokenFromWeb(config)
@@ -63,7 +63,7 @@ func saveToken(token *oauth2.Token) {
 }
 
 // make config
-func getConfig() *oauth2.Config {
+func getConfig(scope string) *oauth2.Config {
 	b, err := ioutil.ReadFile(os.Getenv("GOPATH") + credentialFile)
 	if err != nil {
 		log.Fatalf("unable to read client credentials %v", err)

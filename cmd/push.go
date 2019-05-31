@@ -55,7 +55,7 @@ var pushCmd = &cobra.Command{
 			return
 		}
 
-		config := getConfig()
+		config := getConfig(photoslib.PhotoslibraryScope)
 		tok := loadToken()
 		newTok, err := config.TokenSource(context.TODO(), tok).Token()
 
@@ -77,26 +77,28 @@ var pushCmd = &cobra.Command{
 
 		if selectAlbum {
 			albumMap := *retrievers.GetAlbumsMap(gphotoServ)
-			titles := make([]string, len(albumMap))
-			i := 0
-			for k := range albumMap {
-				titles[i] = k
-				i++
+
+			if len(albumMap) > 1 {
+				titles := make([]string, len(albumMap))
+				i := 0
+				for k := range albumMap {
+					titles[i] = k
+					i++
+				}
+				prompt := promptui.Select{
+					Label: "Select album",
+					Items: titles,
+				}
+
+				_, album, err := prompt.Run()
+
+				if err != nil {
+					log.Fatalln(err)
+				}
+				workingAlbum = albumMap[album]
+			} else {
+				println("No writable albums")
 			}
-
-			prompt := promptui.Select{
-				Label: "Select album",
-				Items: titles,
-			}
-
-			_, album, err := prompt.Run()
-
-			if err != nil {
-				log.Fatalln(err)
-			}
-
-			workingAlbum = albumMap[album]
-			print(workingAlbum, album)
 		}
 
 		var filenames []string

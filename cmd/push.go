@@ -32,7 +32,7 @@ import (
 
 const apiVer = "v1"
 const basePath = "https://photoslibrary.googleapis.com/"
-const MAX_WORKERS = 5
+const MAX_WORKERS = 8
 
 type UploadInfo struct {
 	token    string
@@ -87,46 +87,7 @@ var pushCmd = &cobra.Command{
 	},
 }
 
-func pushFiles(srv *photoslib.Service, client *http.Client, filenames []string, albumID ...string) {
-	tokens := getUploadTokens(client, filenames)
-	mediaItems := make([]*photoslib.NewMediaItem, len(filenames))
-
-	for i := 0; i < len(filenames); i++ {
-		println(tokens[i].filename)
-		newMediaItem := photoslib.NewMediaItem{
-			SimpleMediaItem: &photoslib.SimpleMediaItem{UploadToken: tokens[i].token},
-		}
-		mediaItems[i] = &newMediaItem
-	}
-
-	resp, err := srv.MediaItems.BatchCreate(&photoslib.BatchCreateMediaItemsRequest{
-		NewMediaItems: mediaItems,
-	}).Do()
-
-	// TODO: check for other possible HTTP response errors
-	if resp.HTTPStatusCode == 429 {
-		durations := expobackoff.Calculate(expobackoff.NUM_RETRIES)
-		for _, sleepDur := range durations {
-			time.Sleep(sleepDur)
-			resp, err = srv.MediaItems.BatchCreate(&photoslib.BatchCreateMediaItemsRequest{
-				NewMediaItems: mediaItems}).Do()
-
-			if resp.HTTPStatusCode == 200 {
-				break
-			}
-		}
-	}
-
-	if err == nil {
-		for _, result := range resp.NewMediaItemResults {
-			fmt.Println(result.Status.Message)
-		}
-	} else {
-		log.Fatalf("Did not create %v", err)
-	}
-}
-
-func getUploadTokens(client *http.Client, filenames []string) []UploadInfo {
+func pushFiles(srv *photoslib.Service, client *http.Client, filenames []string) {
 	tokens := make([]UploadInfo, 0)
 	tokenQueue := make(chan UploadInfo)
 
@@ -135,23 +96,8 @@ func getUploadTokens(client *http.Client, filenames []string) []UploadInfo {
 	wg.Add(1)
 	go requestUploadTokens(client, &filenames, &wg, tokenQueue)
 	wg.Add(1)
-	go collectTokens(&wg, tokenQueue, &tokens)
+	go createMedia(srv, &wg, tokenQueue, &tokens)
 	wg.Wait()
-
-	return tokens
-}
-
-func uploader(uploadTasks chan string, tokenQueue chan UploadInfo, client *http.Client, w *sync.WaitGroup) {
-	for filename := range uploadTasks {
-		tok, err := getUploadToken(client, filename)
-		if err != nil {
-			log.Fatalf("unable to make POST request")
-		}
-		if tok != "" {
-			tokenQueue <- UploadInfo{tok, filename}
-		}
-	}
-	w.Done()
 }
 
 func requestUploadTokens(client *http.Client, filenames *[]string, wg *sync.WaitGroup, tokenQueue chan UploadInfo) {
@@ -174,12 +120,50 @@ func requestUploadTokens(client *http.Client, filenames *[]string, wg *sync.Wait
 	w.Wait()
 }
 
-func collectTokens(wg *sync.WaitGroup, tokenQueue chan UploadInfo, tokens *[]UploadInfo) {
+func createMedia(srv *photoslib.Service, wg *sync.WaitGroup, tokenQueue chan UploadInfo, tokens *[]UploadInfo) {
 	defer wg.Done()
+
 	for s := range tokenQueue {
-		println(s.filename)
-		*tokens = append(*tokens, s)
+		newMediaItem := photoslib.NewMediaItem{SimpleMediaItem: &photoslib.SimpleMediaItem{UploadToken: s.token}}
+		mediaItems := []*photoslib.NewMediaItem{&newMediaItem}
+
+		resp, err := srv.MediaItems.BatchCreate(&photoslib.BatchCreateMediaItemsRequest{
+			NewMediaItems: mediaItems}).Do()
+
+		if resp != nil && resp.HTTPStatusCode == 429 {
+			durations := expobackoff.Calculate(expobackoff.NUM_RETRIES)
+			for _, sleepDur := range durations {
+				time.Sleep(sleepDur)
+				resp, err = srv.MediaItems.BatchCreate(&photoslib.BatchCreateMediaItemsRequest{
+					NewMediaItems: mediaItems}).Do()
+
+				if resp != nil && resp.HTTPStatusCode == 200 {
+					break
+				}
+			}
+		}
+
+		if err == nil {
+			for _, result := range resp.NewMediaItemResults {
+				fmt.Println(result.Status.Message)
+			}
+		} else {
+			log.Fatalf("Did not create %v", err)
+		}
 	}
+}
+
+func uploader(uploadTasks chan string, tokenQueue chan UploadInfo, client *http.Client, w *sync.WaitGroup) {
+	for filename := range uploadTasks {
+		tok, err := getUploadToken(client, filename)
+		if err != nil {
+			log.Fatalf("unable to make POST request")
+		}
+		if tok != "" {
+			tokenQueue <- UploadInfo{tok, filename}
+		}
+	}
+	w.Done()
 }
 
 // get upload token

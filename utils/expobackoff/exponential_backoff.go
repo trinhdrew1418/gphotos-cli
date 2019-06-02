@@ -6,8 +6,8 @@ import (
 	"time"
 )
 
-const EXPO_LIM = 8
-const NUM_RETRIES = 15
+const EXPO_LIM = 16
+const NUM_RETRIES = 60
 
 func Calculate(num_retries int) []time.Duration {
 	retryDurations := make([]time.Duration, num_retries)
@@ -25,13 +25,14 @@ func Calculate(num_retries int) []time.Duration {
 func RequestUntilSuccess(action func(*http.Request) (*http.Response, error), r *http.Request) (*http.Response, error) {
 	resp, err := action(r)
 
-	if err != nil || resp.StatusCode == 429 {
+	if err != nil || resp.StatusCode != 200 {
 		durations := Calculate(NUM_RETRIES)
 		for _, sleepDur := range durations {
-			time.Sleep(sleepDur)
+			duration := time.Duration(sleepDur)
+			time.Sleep(duration)
 			resp, err = action(r)
 
-			if err == nil && resp.StatusCode != 429 {
+			if err == nil && resp.StatusCode == 200 {
 				return resp, err
 			}
 		}

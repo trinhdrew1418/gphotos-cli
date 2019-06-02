@@ -16,10 +16,15 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/manifoldco/promptui"
+	"github.com/trinhdrew1418/gphotos-cli/utils"
+	"github.com/trinhdrew1418/gphotos-cli/utils/progressbar"
+	"github.com/vbauerster/mpb"
+	"strings"
+
+	//"github.com/manifoldco/promptui"
 	"github.com/trinhdrew1418/gphotos-cli/utils/expobackoff"
 	"github.com/trinhdrew1418/gphotos-cli/utils/filetypes"
-	"github.com/trinhdrew1418/gphotos-cli/utils/retrievers"
+	//"github.com/trinhdrew1418/gphotos-cli/utils/retrievers"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -32,9 +37,17 @@ import (
 	photoslib "google.golang.org/api/photoslibrary/v1"
 )
 
-const apiVer = "v1"
-const basePath = "https://photoslibrary.googleapis.com/"
-const MAX_WORKERS = 8
+const (
+	apiVer      = "v1"
+	basePath    = "https://photoslibrary.googleapis.com/"
+	MAX_WORKERS = 8
+)
+
+var (
+	recursive bool
+	verbose   bool
+	pbar      mpb.Bar
+)
 
 type UploadInfo struct {
 	token    string
@@ -74,49 +87,86 @@ var pushCmd = &cobra.Command{
 		}
 
 		var album string
-		if selectAlbum {
-			albumMap := *retrievers.GetAlbumsMap(gphotoServ)
-
-			if len(albumMap) >= 1 {
-				titles := make([]string, len(albumMap))
-				i := 0
-				for k := range albumMap {
-					titles[i] = k
-					i++
-				}
-				prompt := promptui.Select{
-					Label: "Select album",
-					Items: titles,
-				}
-
-				_, album, err = prompt.Run()
-
-				if err != nil {
-					log.Fatalln(err)
-				}
-				workingAlbum = albumMap[album]
-			} else {
-				println("No writable albums")
-			}
-		}
+		//if selectAlbum {
+		//	albumMap := *retrievers.GetAlbumsMap(gphotoServ)
+		//
+		//	if len(albumMap) >= 1 {
+		//		titles := make([]string, len(albumMap))
+		//		i := 0
+		//		for k := range albumMap {
+		//			titles[i] = k
+		//			i++
+		//		}
+		//		prompt := promptui.Select{
+		//			Label: "Select album",
+		//			Items: titles,
+		//		}
+		//
+		//		_, album, err = prompt.Run()
+		//
+		//		if err != nil {
+		//			log.Fatalln(err)
+		//		}
+		//		workingAlbum = albumMap[album]
+		//	} else {
+		//		println("No writable albums")
+		//	}
+		//}
 
 		var filenames []string
+		var directories []string
 
-		for _, file := range args {
-			if filetypes.IsImage(file) {
-				filenames = append(filenames, file)
+		for _, filepath := range args {
+			if utils.IsFile(filepath) && filetypes.IsMedia(filepath) {
+				filenames = append(filenames, filepath)
+			} else {
+				directories = append(directories, filepath)
 			}
 		}
 
-		if workingAlbum != "" {
-			fmt.Println("Uploading the following files to " + album + ":")
-		} else {
-			fmt.Println("Uploading the following files:")
-		}
-		for _, filename := range filenames {
-			fmt.Println("-", filename)
+		for _, dirPath := range directories {
+			filenames = append(filenames, utils.GetFilepaths(dirPath, recursive, filetypes.IsMedia)...)
 		}
 
+		var amtBytes int64
+		for _, filepath := range filenames {
+			file, _ := os.Stat(filepath)
+			amtBytes += file.Size()
+		}
+
+		var answer string
+		if verbose {
+			if workingAlbum != "" {
+				fmt.Println("Uploading the following files to " + album + ":")
+			} else {
+				fmt.Println("Uploading the following files:")
+			}
+			for _, filename := range filenames {
+				fmt.Println("-", filename)
+			}
+		}
+
+		if amtBytes < (1 << 10) {
+			println(fmt.Sprintf("Uploading %v files, %.4g B", len(filenames), float64(amtBytes)))
+		} else if amtBytes < (1 << 10 * 2) {
+			println(fmt.Sprintf("Uploading %v files, %.4g KB", len(filenames), float64(amtBytes)/float64(1<<10*1)))
+		} else if amtBytes < (1 << 10 * 3) {
+			println(fmt.Sprintf("Uploading %d files, %.4g MB", len(filenames), float64(amtBytes)/float64(1<<10*2)))
+		} else {
+			println(fmt.Sprintf("Uploading %d files, %.4g GB", len(filenames), float64(amtBytes)/float64(1<<10*3)))
+		}
+
+		println("Do you want to proceed ([y]/n)?")
+		_, err = fmt.Scan(&answer)
+		if err != nil {
+			log.Fatalf("Unable to read answer")
+		}
+
+		if strings.ToLower(answer) != "y" {
+			return
+		}
+
+		pbar = *progressbar.Make(int64(len(filenames)))
 		pushFiles(gphotoServ, client, filenames)
 	},
 }
@@ -165,10 +215,11 @@ func createMedia(srv *photoslib.Service, wg *sync.WaitGroup, tokenQueue chan Upl
 			AlbumId:       workingAlbum,
 			NewMediaItems: mediaItems}).Do()
 
-		if resp != nil && resp.HTTPStatusCode == 429 {
+		if resp != nil && resp.HTTPStatusCode != 429 {
 			durations := expobackoff.Calculate(expobackoff.NUM_RETRIES)
 			for _, sleepDur := range durations {
-				time.Sleep(sleepDur)
+				duration := time.Duration(sleepDur)
+				time.Sleep(duration)
 				resp, err = srv.MediaItems.BatchCreate(&photoslib.BatchCreateMediaItemsRequest{
 					AlbumId:       workingAlbum,
 					NewMediaItems: mediaItems}).Do()
@@ -181,7 +232,10 @@ func createMedia(srv *photoslib.Service, wg *sync.WaitGroup, tokenQueue chan Upl
 
 		if err == nil {
 			for _, result := range resp.NewMediaItemResults {
-				fmt.Println(result.Status.Message)
+				pbar.IncrBy(1)
+				if verbose {
+					fmt.Println(result.Status.Message, "uploaded ", s.filename)
+				}
 			}
 		} else {
 			log.Fatalf("Did not create %v", err)
@@ -211,7 +265,7 @@ func getUploadToken(client *http.Client, filename string) (token string, err err
 
 	req, err := http.NewRequest("POST", fmt.Sprintf("%s/%s/uploads", basePath, apiVer), file)
 	if err != nil {
-		log.Fatalf("fucked up making the http format %v", err)
+		log.Fatal(err)
 	}
 
 	req.Header.Set("Content-Type", "application/octet-stream")
@@ -249,6 +303,8 @@ func init() {
 	// Cobra supports Persistent Flags which will work for this command
 	// and all subcommands, e.g.:
 	// pushCmd.PersistentFlags().String("foo", "", "A help for foo")
+	pushCmd.PersistentFlags().BoolVarP(&recursive, "recursive", "r", false, "Recursively select files to be uploaded from directories")
+	pushCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Print out uploaded files")
 
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:

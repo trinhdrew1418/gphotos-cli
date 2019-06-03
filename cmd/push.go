@@ -21,10 +21,10 @@ import (
 	"github.com/vbauerster/mpb"
 	"strings"
 
-	//"github.com/manifoldco/promptui"
+	"github.com/manifoldco/promptui"
 	"github.com/trinhdrew1418/gphotos-cli/utils/expobackoff"
 	"github.com/trinhdrew1418/gphotos-cli/utils/filetypes"
-	//"github.com/trinhdrew1418/gphotos-cli/utils/retrievers"
+	"github.com/trinhdrew1418/gphotos-cli/utils/retrievers"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -87,31 +87,31 @@ var pushCmd = &cobra.Command{
 		}
 
 		var album string
-		//if selectAlbum {
-		//	albumMap := *retrievers.GetAlbumsMap(gphotoServ)
-		//
-		//	if len(albumMap) >= 1 {
-		//		titles := make([]string, len(albumMap))
-		//		i := 0
-		//		for k := range albumMap {
-		//			titles[i] = k
-		//			i++
-		//		}
-		//		prompt := promptui.Select{
-		//			Label: "Select album",
-		//			Items: titles,
-		//		}
-		//
-		//		_, album, err = prompt.Run()
-		//
-		//		if err != nil {
-		//			log.Fatalln(err)
-		//		}
-		//		workingAlbum = albumMap[album]
-		//	} else {
-		//		println("No writable albums")
-		//	}
-		//}
+		if selectAlbum {
+			albumMap := *retrievers.GetAlbumsMap(gphotoServ)
+
+			if len(albumMap) >= 1 {
+				titles := make([]string, len(albumMap))
+				i := 0
+				for k := range albumMap {
+					titles[i] = k
+					i++
+				}
+				prompt := promptui.Select{
+					Label: "Select album",
+					Items: titles,
+				}
+
+				_, album, err = prompt.Run()
+
+				if err != nil {
+					log.Fatalln(err)
+				}
+				workingAlbum = albumMap[album]
+			} else {
+				println("No writable albums")
+			}
+		}
 
 		var filenames []string
 		var directories []string
@@ -156,7 +156,7 @@ var pushCmd = &cobra.Command{
 			println(fmt.Sprintf("Uploading %d files, %.4g GB", len(filenames), float64(amtBytes)/float64(1<<10*3)))
 		}
 
-		println("Do you want to proceed ([y]/n)?")
+		println("Do you wish to proceed ([y]/n)?")
 		_, err = fmt.Scan(&answer)
 		if err != nil {
 			log.Fatalf("Unable to read answer")

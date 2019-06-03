@@ -5,7 +5,7 @@ import (
 	"log"
 )
 
-func GetAlbumsMap(s *photoslibrary.Service) *map[string]string {
+func GetAlbumsToID(s *photoslibrary.Service) *map[string]string {
 	albumsResp, err := s.Albums.List().Do()
 	if err != nil {
 		log.Fatalln(err)
@@ -19,4 +19,25 @@ func GetAlbumsMap(s *photoslibrary.Service) *map[string]string {
 	}
 
 	return &stringToId
+}
+
+func makeAlbumMap(s *photoslibrary.Service) *map[string] *map[string]*photoslibrary.Album {
+	albumsResp, err := s.Albums.List().Do()
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	stringToAlbum := make(map[string]string)
+	for _, album := range albumsResp.Albums {
+			stringToAlbum[album.Title] = &album
+	}
+
+	return &stringToAlbum
+}
+
+}
+
+func GetAlbumID(albumName string, s *photoslibrary.Service) string {
+	stringToId := GetAlbumsMap(s)
+
 }

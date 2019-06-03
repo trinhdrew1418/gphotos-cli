@@ -24,9 +24,10 @@ import (
 )
 
 var (
-	cfgFile      string
-	workingAlbum string
-	selectAlbum  bool
+	cfgFile        string
+	workingAlbum   string
+	workingAlbumID string
+	selectAlbum    bool
 )
 
 // rootCmd represents the base command when called without any subcommands

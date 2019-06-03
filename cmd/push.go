@@ -85,6 +85,16 @@ var pushCmd = &cobra.Command{
 		}
 
 		var album string
+
+		if selectAlbum && workingAlbum != "" {
+			println("Can only either use the album select or declare an album destination, not both")
+			return
+		}
+
+		if workingAlbum != "" {
+
+		}
+
 		if selectAlbum {
 			albumMap := *retrievers.GetAlbumsMap(gphotoServ)
 

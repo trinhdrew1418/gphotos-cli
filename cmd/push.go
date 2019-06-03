@@ -22,19 +22,17 @@ import (
 	"strings"
 
 	"github.com/manifoldco/promptui"
+	"github.com/spf13/cobra"
 	"github.com/trinhdrew1418/gphotos-cli/utils/expobackoff"
 	"github.com/trinhdrew1418/gphotos-cli/utils/filetypes"
 	"github.com/trinhdrew1418/gphotos-cli/utils/retrievers"
+	"golang.org/x/net/context"
+	photoslib "google.golang.org/api/photoslibrary/v1"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
 	"sync"
-	"time"
-
-	"github.com/spf13/cobra"
-	"golang.org/x/net/context"
-	photoslib "google.golang.org/api/photoslibrary/v1"
 )
 
 const (
@@ -211,34 +209,20 @@ func createMedia(srv *photoslib.Service, wg *sync.WaitGroup, tokenQueue chan Upl
 		newMediaItem := photoslib.NewMediaItem{SimpleMediaItem: &photoslib.SimpleMediaItem{UploadToken: s.token}}
 		mediaItems := []*photoslib.NewMediaItem{&newMediaItem}
 
-		resp, err := srv.MediaItems.BatchCreate(&photoslib.BatchCreateMediaItemsRequest{
+		makeItems := srv.MediaItems.BatchCreate(&photoslib.BatchCreateMediaItemsRequest{
 			AlbumId:       workingAlbum,
-			NewMediaItems: mediaItems}).Do()
+			NewMediaItems: mediaItems}).Do
 
-		if resp != nil && resp.HTTPStatusCode != 429 {
-			durations := expobackoff.Calculate(expobackoff.NUM_RETRIES)
-			for _, sleepDur := range durations {
-				duration := time.Duration(sleepDur)
-				time.Sleep(duration)
-				resp, err = srv.MediaItems.BatchCreate(&photoslib.BatchCreateMediaItemsRequest{
-					AlbumId:       workingAlbum,
-					NewMediaItems: mediaItems}).Do()
-
-				if resp != nil && resp.HTTPStatusCode == 200 {
-					break
-				}
-			}
-		}
+		resp, err := expobackoff.DoUntilSuccess(makeItems)
 
 		if err == nil {
-			for _, result := range resp.NewMediaItemResults {
-				pbar.IncrBy(1)
-				if verbose {
-					fmt.Println(result.Status.Message, "uploaded ", s.filename)
-				}
+			result := resp.NewMediaItemResults[0]
+			pbar.IncrBy(1)
+			if verbose {
+				fmt.Println(result.Status.Message, "uploaded ", s.filename)
 			}
 		} else {
-			log.Fatalf("Did not create %v", err)
+			log.Fatalf("Did not create", s.filename)
 		}
 	}
 }

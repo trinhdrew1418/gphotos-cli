@@ -16,8 +16,17 @@ package cmd
 
 import (
 	"fmt"
-
+	"github.com/manifoldco/promptui"
 	"github.com/spf13/cobra"
+	"google.golang.org/api/photoslibrary/v1"
+	"strconv"
+	"time"
+)
+
+var (
+	pastNumDays string
+	startDate   string
+	endDate     string
 )
 
 // listCmd represents the list command
@@ -31,7 +40,43 @@ Cobra is a CLI library for Go that empowers applications.
 This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("list called")
+		_, gphotoService := getClientService(photoslibrary.PhotoslibraryScope)
+
+		dateOptions := map[string]int{
+			"Today":                       0,
+			"Past week":                   1,
+			"Past month":                  2,
+			"Specific number of days ago": 3,
+			"Specific date range":         4,
+		}
+
+		println()
+		pmpt := promptui.Select{
+			Label: "Select a time frame: ",
+			Items: []string{"Today", "Past week", "Past month", "Specific number of days ago", "Specific date range"},
+		}
+
+		_, resp, err := pmpt.Run()
+
+		switch dateOptions[resp] {
+		case 0:
+			year, month, day := time.Now().Date()
+		case 1:
+			year, month, day := time.Now().AddDate(0, 0, -7).Date()
+		case 2:
+			year, month, day := time.Now().AddDate(0, -1, 0).Date()
+		case 3:
+			var numDays int
+		case 4:
+		}
+
+		println("Select up to 10 categories from the following: ")
+		println("ANIMALS LANDMARKS PETS UTILITY BIRTHDAYS LANDSCAPES RECEIPTS")
+		println("WEDDINGS CITYSCAPES NIGHT SCREENSHOTS WHITEBOARDS DOCUMENTS")
+		println("PEOPLE SELFIES FOOD PERFORMANCES SPORT")
+
+		fmt.Scan()
+
 	},
 }
 

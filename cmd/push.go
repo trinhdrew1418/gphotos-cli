@@ -157,11 +157,11 @@ var pushCmd = &cobra.Command{
 		if amtBytes < (1 << 10) {
 			println(fmt.Sprintf("Uploading %v files, %.4g B", len(filenames), float64(amtBytes)))
 		} else if amtBytes < (1 << 10 * 2) {
-			println(fmt.Sprintf("Uploading %v files, %.4g KB", len(filenames), float64(amtBytes)/float64(1<<10*1)))
+			println(fmt.Sprintf("Uploading %v files, %.4g KB", len(filenames), float64(amtBytes)/float64(1<<(10*1))))
 		} else if amtBytes < (1 << 10 * 3) {
-			println(fmt.Sprintf("Uploading %d files, %.4g MB", len(filenames), float64(amtBytes)/float64(1<<10*2)))
+			println(fmt.Sprintf("Uploading %d files, %.4g MB", len(filenames), float64(amtBytes)/float64(1<<(10*2))))
 		} else {
-			println(fmt.Sprintf("Uploading %d files, %.4g GB", len(filenames), float64(amtBytes)/float64(1<<10*3)))
+			println(fmt.Sprintf("Uploading %d files, %.4g GB", len(filenames), float64(amtBytes)/float64(1<<(10*3))))
 		}
 
 		println("Do you wish to proceed ([y]/n)?")

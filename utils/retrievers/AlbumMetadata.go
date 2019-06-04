@@ -6,38 +6,41 @@ import (
 )
 
 func GetAlbumsToID(s *photoslibrary.Service) *map[string]string {
-	albumsResp, err := s.Albums.List().Do()
-	if err != nil {
-		log.Fatalln(err)
-	}
-
-	stringToId := make(map[string]string)
-	for _, album := range albumsResp.Albums {
-		if album.IsWriteable {
-			stringToId[album.Title] = album.Id
+	albumMap := *makeAlbumMap(s)
+	albumToID := make(map[string]string)
+	for title := range albumMap {
+		if albumMap[title].IsWriteable {
+			albumToID[title] = albumMap[title].Id
 		}
 	}
 
-	return &stringToId
+	return &albumToID
 }
 
-func makeAlbumMap(s *photoslibrary.Service) *map[string] *map[string]*photoslibrary.Album {
+func makeAlbumMap(s *photoslibrary.Service) *map[string]*photoslibrary.Album {
 	albumsResp, err := s.Albums.List().Do()
 	if err != nil {
 		log.Fatalln(err)
 	}
 
-	stringToAlbum := make(map[string]string)
+	stringToAlbum := make(map[string]*photoslibrary.Album)
 	for _, album := range albumsResp.Albums {
-			stringToAlbum[album.Title] = &album
+		stringToAlbum[album.Title] = album
 	}
 
 	return &stringToAlbum
 }
 
-}
-
 func GetAlbumID(albumName string, s *photoslibrary.Service) string {
-	stringToId := GetAlbumsMap(s)
+	albumMap := *makeAlbumMap(s)
 
+	if val, ok := albumMap[albumName]; ok {
+		if !val.IsWriteable {
+			log.Fatalln("Album exists but is not writable")
+		}
+		return val.Id
+	} else {
+		log.Fatalln("Album does not exist")
+		return ""
+	}
 }

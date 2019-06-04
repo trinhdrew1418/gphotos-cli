@@ -92,16 +92,16 @@ var pushCmd = &cobra.Command{
 		}
 
 		if workingAlbum != "" {
-
+			workingAlbumID = retrievers.GetAlbumID(workingAlbum, gphotoServ)
 		}
 
 		if selectAlbum {
-			albumMap := *retrievers.GetAlbumsMap(gphotoServ)
+			albumToID := *retrievers.GetAlbumsToID(gphotoServ)
 
-			if len(albumMap) >= 1 {
-				titles := make([]string, len(albumMap))
+			if len(albumToID) >= 1 {
+				titles := make([]string, len(albumToID))
 				i := 0
-				for k := range albumMap {
+				for k := range albumToID {
 					titles[i] = k
 					i++
 				}
@@ -115,7 +115,7 @@ var pushCmd = &cobra.Command{
 				if err != nil {
 					log.Fatalln(err)
 				}
-				workingAlbum = albumMap[album]
+				workingAlbumID = albumToID[album]
 			} else {
 				println("No writable albums")
 			}
@@ -220,7 +220,7 @@ func createMedia(srv *photoslib.Service, wg *sync.WaitGroup, tokenQueue chan Upl
 		mediaItems := []*photoslib.NewMediaItem{&newMediaItem}
 
 		makeItems := srv.MediaItems.BatchCreate(&photoslib.BatchCreateMediaItemsRequest{
-			AlbumId:       workingAlbum,
+			AlbumId:       workingAlbumID,
 			NewMediaItems: mediaItems}).Do
 
 		resp, err := expobackoff.DoUntilSuccess(makeItems)

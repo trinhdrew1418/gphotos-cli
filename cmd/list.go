@@ -19,7 +19,7 @@ import (
 	"github.com/manifoldco/promptui"
 	"github.com/spf13/cobra"
 	"google.golang.org/api/photoslibrary/v1"
-	"strconv"
+	"strings"
 	"time"
 )
 
@@ -28,6 +28,12 @@ var (
 	startDate   string
 	endDate     string
 )
+
+type Date struct {
+	day   int
+	month int
+	year  int
+}
 
 // listCmd represents the list command
 var listCmd = &cobra.Command{
@@ -42,34 +48,6 @@ to quickly create a Cobra application.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		_, gphotoService := getClientService(photoslibrary.PhotoslibraryScope)
 
-		dateOptions := map[string]int{
-			"Today":                       0,
-			"Past week":                   1,
-			"Past month":                  2,
-			"Specific number of days ago": 3,
-			"Specific date range":         4,
-		}
-
-		println()
-		pmpt := promptui.Select{
-			Label: "Select a time frame: ",
-			Items: []string{"Today", "Past week", "Past month", "Specific number of days ago", "Specific date range"},
-		}
-
-		_, resp, err := pmpt.Run()
-
-		switch dateOptions[resp] {
-		case 0:
-			year, month, day := time.Now().Date()
-		case 1:
-			year, month, day := time.Now().AddDate(0, 0, -7).Date()
-		case 2:
-			year, month, day := time.Now().AddDate(0, -1, 0).Date()
-		case 3:
-			var numDays int
-		case 4:
-		}
-
 		println("Select up to 10 categories from the following: ")
 		println("ANIMALS LANDMARKS PETS UTILITY BIRTHDAYS LANDSCAPES RECEIPTS")
 		println("WEDDINGS CITYSCAPES NIGHT SCREENSHOTS WHITEBOARDS DOCUMENTS")
@@ -78,6 +56,75 @@ to quickly create a Cobra application.`,
 		fmt.Scan()
 
 	},
+}
+
+func GetDates() (Date, Date) {
+	dateOptions := map[string]int{
+		"Today":                       0,
+		"Past week":                   1,
+		"Past month":                  2,
+		"Specific number of days ago": 3,
+		"Specific date range":         4,
+	}
+
+	var startDate Date
+	var endDate Date
+
+	println()
+	pmpt := promptui.Select{
+		Label: "Select a time frame: ",
+		Items: []string{"Today", "Past week", "Past month", "Specific number of days ago", "Specific date range"},
+	}
+
+	_, resp, err := pmpt.Run()
+
+	switch dateOptions[resp] {
+	case 0:
+		startDate = getSomeDaysAgo(0)
+		endDate = startDate
+	case 1:
+		endDate = getSomeDaysAgo(0)
+		startDate = getSomeDaysAgo(7)
+	case 2:
+		endDate = getSomeDaysAgo(0)
+		startDate = getSomeDaysAgo(30)
+	case 3:
+		var date string
+		fmt.Scan(&date)
+		strings.Split(date, "-")
+		fmt.Scan(&date)
+		strings.Split(date, "-")
+		var numDays int
+	case 4:
+	}
+
+	return startDate, endDate
+}
+
+func getSomeDaysAgo(num int) Date {
+	Months := map[string]int{
+		"January":   1,
+		"February":  2,
+		"March":     3,
+		"April":     4,
+		"May":       5,
+		"June":      6,
+		"July":      7,
+		"August":    8,
+		"September": 9,
+		"October":   10,
+		"November":  11,
+		"December":  12,
+	}
+
+	var retDate Date
+	year, month, day := time.Now().AddDate(0, 0, -num).Date()
+	retDate.year = year
+	retDate.month = Months[month.String()]
+	retDate.month = Months[month.String()]
+	retDate.day = day
+
+	return retDate
 }
 
 func init() {

@@ -15,18 +15,23 @@
 package cmd
 
 import (
+	"encoding/ascii85"
 	"fmt"
 	"github.com/manifoldco/promptui"
 	"github.com/spf13/cobra"
+	dataflow "google.golang.org/api/dataflow/v1b3"
 	"google.golang.org/api/photoslibrary/v1"
+	"log"
+	"strconv"
 	"strings"
 	"time"
 )
 
 var (
 	pastNumDays string
-	startDate   string
-	endDate     string
+	startDate   Date
+	endDate     Date
+	categories []string
 )
 
 type Date struct {
@@ -48,14 +53,44 @@ to quickly create a Cobra application.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		_, gphotoService := getClientService(photoslibrary.PhotoslibraryScope)
 
-		println("Select up to 10 categories from the following: ")
-		println("ANIMALS LANDMARKS PETS UTILITY BIRTHDAYS LANDSCAPES RECEIPTS")
-		println("WEDDINGS CITYSCAPES NIGHT SCREENSHOTS WHITEBOARDS DOCUMENTS")
-		println("PEOPLE SELFIES FOOD PERFORMANCES SPORT")
+		startDate, endDate = GetDates()
+		categories = GetCategories()
 
-		fmt.Scan()
+		photoslibrary.Filters{
+		photoslibrary.ContentFilter{
+			IncludedContentCategories:categories,
+		},
+		
+		}
 
+
+		gphotoService.
 	},
+}
+
+func GetCategories() ([]string) {
+	println("Select up to 10 categories from the following: ")
+	println("ANIMALS LANDMARKS PETS UTILITY BIRTHDAYS LANDSCAPES RECEIPTS")
+	println("WEDDINGS CITYSCAPES NIGHT SCREENSHOTS WHITEBOARDS DOCUMENTS")
+	println("PEOPLE SELFIES FOOD PERFORMANCES SPORT")
+
+	var parseString string
+	print("Select categories [capital or lowercase, separate by spaces]: ")
+	_, err := fmt.Scan(&parseString)
+	if err != nil {
+		log.Fatal("Unable to obtain categories")
+	}
+
+	categories := strings.Split(parseString, " ")
+	if len(categories) > 10 {
+		log.Fatal("Too many categories")
+	}
+
+	for i, str := range categories {
+		categories[i] = strings.ToUpper(str)
+	}
+
+	return categories
 }
 
 func GetDates() (Date, Date) {
@@ -65,18 +100,22 @@ func GetDates() (Date, Date) {
 		"Past month":                  2,
 		"Specific number of days ago": 3,
 		"Specific date range":         4,
+		"Any": 						   5,
 	}
 
 	var startDate Date
 	var endDate Date
 
-	println()
 	pmpt := promptui.Select{
 		Label: "Select a time frame: ",
-		Items: []string{"Today", "Past week", "Past month", "Specific number of days ago", "Specific date range"},
+		Items: []string{"Today", "Past week", "Past month", "Specific number of days ago",
+			"Specific date range", "Any"},
 	}
 
 	_, resp, err := pmpt.Run()
+	if err != nil {
+		log.Fatal("Prompt failed to open")
+	}
 
 	switch dateOptions[resp] {
 	case 0:
@@ -89,13 +128,45 @@ func GetDates() (Date, Date) {
 		endDate = getSomeDaysAgo(0)
 		startDate = getSomeDaysAgo(30)
 	case 3:
-		var date string
-		fmt.Scan(&date)
-		strings.Split(date, "-")
-		fmt.Scan(&date)
-		strings.Split(date, "-")
 		var numDays int
+		print("Number of days: ")
+
+		_, err := fmt.Scan(&numDays)
+		if err != nil {
+			log.Fatal("Could not read the amount of days")
+		}
+
+		endDate = getSomeDaysAgo(0)
+		startDate = getSomeDaysAgo(numDays)
+
 	case 4:
+		var sDate string
+		var eDate string
+
+		print("Start Date [MM-DD-YYYY]:")
+		_, err := fmt.Scan(&sDate)
+		if err != nil {
+			log.Fatal("Unable to read  response")
+		}
+
+		stringDate := strings.Split(sDate, "-")
+		startDate.month, _ = strconv.Atoi(stringDate[0])
+		startDate.day, _ = strconv.Atoi(stringDate[1])
+		startDate.year, _ = strconv.Atoi(stringDate[2])
+
+		_, err = fmt.Scan(&sDate)
+		if err != nil {
+			log.Fatal("Unable to read response")
+		}
+
+		print("Start End Date [MM-DD-YYYY]:")
+		stringDate = strings.Split(eDate, "-")
+
+		endDate.month, _ = strconv.Atoi(stringDate[0])
+		endDate.day, _ = strconv.Atoi(stringDate[1])
+		endDate.year, _ = strconv.Atoi(stringDate[2])
+
+		print("The following range will be listed: ", sDate, " to ", eDate)
 	}
 
 	return startDate, endDate

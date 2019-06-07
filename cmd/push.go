@@ -42,9 +42,10 @@ const (
 )
 
 var (
-	recursive bool
-	verbose   bool
-	pbar      mpb.Bar
+	recursive      bool
+	verbose        bool
+	pbar           mpb.Bar
+	failedToUpload []string
 )
 
 type UploadInfo struct {
@@ -176,6 +177,13 @@ var pushCmd = &cobra.Command{
 
 		pbar = *progressbar.Make(int64(len(filenames)))
 		pushFiles(gphotoServ, client, filenames)
+
+		if len(failedToUpload) > 0 {
+			println("The following files failed to upload: ")
+			for _, fname := range failedToUpload {
+				print(" - ", fname)
+			}
+		}
 	},
 }
 
@@ -273,7 +281,7 @@ func getUploadToken(client *http.Client, filename string) (token string, err err
 	}
 
 	if resp.StatusCode != 200 {
-		println(filename + " failed to upload")
+		failedToUpload = append(failedToUpload, filename)
 		return "", nil
 	}
 

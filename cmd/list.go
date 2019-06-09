@@ -15,11 +15,9 @@
 package cmd
 
 import (
-	"encoding/ascii85"
 	"fmt"
 	"github.com/manifoldco/promptui"
 	"github.com/spf13/cobra"
-	dataflow "google.golang.org/api/dataflow/v1b3"
 	"google.golang.org/api/photoslibrary/v1"
 	"log"
 	"strconv"
@@ -31,7 +29,7 @@ var (
 	pastNumDays string
 	startDate   Date
 	endDate     Date
-	categories []string
+	categories  []string
 )
 
 type Date struct {
@@ -56,19 +54,39 @@ to quickly create a Cobra application.`,
 		startDate, endDate = GetDates()
 		categories = GetCategories()
 
-		photoslibrary.Filters{
-		photoslibrary.ContentFilter{
-			IncludedContentCategories:categories,
-		},
-		
+		content := photoslibrary.ContentFilter{IncludedContentCategories: categories}
+		filt := photoslibrary.Filters{
+			ContentFilter: &content,
+			DateFilter: &photoslibrary.DateFilter{
+				Ranges: []*photoslibrary.DateRange{
+					{
+						StartDate: &photoslibrary.Date{
+							Day:   int64(startDate.day),
+							Month: int64(startDate.month),
+							Year:  int64(startDate.year),
+						},
+						EndDate: &photoslibrary.Date{
+							Day:   int64(endDate.day),
+							Month: int64(endDate.month),
+							Year:  int64(endDate.year),
+						},
+					},
+				},
+			},
 		}
 
+		resp, err := gphotoService.MediaItems.Search(&photoslibrary.SearchMediaItemsRequest{Filters: &filt}).Do()
+		if err != nil {
+			log.Fatal("Failed media search")
+		}
+		for _, mItem := range resp.MediaItems {
+			println(mItem.BaseUrl)
+		}
 
-		gphotoService.
 	},
 }
 
-func GetCategories() ([]string) {
+func GetCategories() []string {
 	println("Select up to 10 categories from the following: ")
 	println("ANIMALS LANDMARKS PETS UTILITY BIRTHDAYS LANDSCAPES RECEIPTS")
 	println("WEDDINGS CITYSCAPES NIGHT SCREENSHOTS WHITEBOARDS DOCUMENTS")
@@ -100,7 +118,7 @@ func GetDates() (Date, Date) {
 		"Past month":                  2,
 		"Specific number of days ago": 3,
 		"Specific date range":         4,
-		"Any": 						   5,
+		"Any":                         5,
 	}
 
 	var startDate Date

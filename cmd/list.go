@@ -52,7 +52,9 @@ to quickly create a Cobra application.`,
 		_, gphotoService := getClientService(photoslibrary.PhotoslibraryScope)
 
 		startDate, endDate = GetDates()
+		println()
 		categories = GetCategories()
+		println()
 
 		content := photoslibrary.ContentFilter{IncludedContentCategories: categories}
 		filt := photoslibrary.Filters{
@@ -81,19 +83,20 @@ to quickly create a Cobra application.`,
 		}
 		for _, mItem := range resp.MediaItems {
 			println(mItem.BaseUrl)
+			println()
 		}
 
 	},
 }
 
 func GetCategories() []string {
-	println("Select up to 10 categories from the following: ")
-	println("ANIMALS LANDMARKS PETS UTILITY BIRTHDAYS LANDSCAPES RECEIPTS")
-	println("WEDDINGS CITYSCAPES NIGHT SCREENSHOTS WHITEBOARDS DOCUMENTS")
-	println("PEOPLE SELFIES FOOD PERFORMANCES SPORT")
+	println("Here are the available categories: ")
+	println(" - ANIMALS \n - LANDMARKS \n - PETS \n - UTILITY \n - BIRTHDAYS \n - LANDSCAPES \n - RECEIPTS")
+	println(" - WEDDINGS \n - CITYSCAPES \n - NIGHT \n - SCREENSHOTS \n - WHITEBOARDS \n - DOCUMENTS")
+	println(" - PEOPLE \n - SELFIES \n - FOOD \n - PERFORMANCES \n - SPORT")
 
 	var parseString string
-	print("Select categories [capital or lowercase, separate by spaces]: ")
+	print("Select up to 10 categories [capital or lowercase, separate by spaces]: ")
 	_, err := fmt.Scan(&parseString)
 	if err != nil {
 		log.Fatal("Unable to obtain categories")

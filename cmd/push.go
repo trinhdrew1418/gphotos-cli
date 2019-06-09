@@ -181,7 +181,7 @@ var pushCmd = &cobra.Command{
 		if len(failedToUpload) > 0 {
 			println("The following files failed to upload: ")
 			for _, fname := range failedToUpload {
-				print(" - ", fname)
+				println(" - ", fname)
 			}
 		}
 	},

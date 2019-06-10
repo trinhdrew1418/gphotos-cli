@@ -26,10 +26,9 @@ import (
 )
 
 var (
-	pastNumDays string
-	startDate   Date
-	endDate     Date
-	categories  []string
+	startDate  Date
+	endDate    Date
+	categories []string
 )
 
 type Date struct {
@@ -41,25 +40,27 @@ type Date struct {
 // listCmd represents the list command
 var listCmd = &cobra.Command{
 	Use:   "list",
-	Short: "A brief description of your command",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
-
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+	Short: "Searches your google photos library for qualifying search entries",
+	Long: `Find relevant google photos entries in your library. This command will prompt
+you for photos qualifying photos throughout a specified time range, content type, and
+camera type.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		_, gphotoService := getClientService(photoslibrary.PhotoslibraryScope)
+		var noDate bool
+		var noCat bool
 
-		startDate, endDate = GetDates()
+		startDate, endDate = GetDates(&noDate)
 		println()
-		categories = GetCategories()
+		categories = GetCategories(&noCat)
 		println()
 
-		content := photoslibrary.ContentFilter{IncludedContentCategories: categories}
-		filt := photoslibrary.Filters{
-			ContentFilter: &content,
-			DateFilter: &photoslibrary.DateFilter{
+		filt := photoslibrary.Filters{}
+		if !noCat {
+			filt.ContentFilter = &photoslibrary.ContentFilter{IncludedContentCategories: categories}
+		}
+
+		if !noDate {
+			filt.DateFilter = &photoslibrary.DateFilter{
 				Ranges: []*photoslibrary.DateRange{
 					{
 						StartDate: &photoslibrary.Date{
@@ -74,7 +75,7 @@ to quickly create a Cobra application.`,
 						},
 					},
 				},
-			},
+			}
 		}
 
 		resp, err := gphotoService.MediaItems.Search(&photoslibrary.SearchMediaItemsRequest{Filters: &filt}).Do()
@@ -89,14 +90,35 @@ to quickly create a Cobra application.`,
 	},
 }
 
-func GetCategories() []string {
+func GetCategories(noCat *bool) []string {
+	allCategories := map[string]bool{
+		"ANIMALS":      true,
+		"LANDMARKS":    true,
+		"PETS":         true,
+		"UTILITY":      true,
+		"BIRTHDAYS":    true,
+		"LANDSCAPES":   true,
+		"RECEIPTS":     true,
+		"WEDDINGS":     true,
+		"CITYSCAPES":   true,
+		"NIGHT":        true,
+		"SCREENSHOTS":  true,
+		"WHITEBOARDS":  true,
+		"DOCUMENTS":    true,
+		"PEOPLE":       true,
+		"SELFIES":      true,
+		"FOOD":         true,
+		"PERFORMANCES": true,
+		"SPORT":        true}
+
 	println("Here are the available categories: ")
-	println(" - ANIMALS \n - LANDMARKS \n - PETS \n - UTILITY \n - BIRTHDAYS \n - LANDSCAPES \n - RECEIPTS")
-	println(" - WEDDINGS \n - CITYSCAPES \n - NIGHT \n - SCREENSHOTS \n - WHITEBOARDS \n - DOCUMENTS")
-	println(" - PEOPLE \n - SELFIES \n - FOOD \n - PERFORMANCES \n - SPORT")
+	for _, cat := range allCategories {
+		println(" - ", cat)
+	}
+	println(" - ALL")
 
 	var parseString string
-	print("Select up to 10 categories [capital or lowercase, separate by spaces]: ")
+	print("Select up to 10 categories (ALL if you want any) [capital or lowercase, separate by spaces]: ")
 	_, err := fmt.Scan(&parseString)
 	if err != nil {
 		log.Fatal("Unable to obtain categories")
@@ -108,13 +130,24 @@ func GetCategories() []string {
 	}
 
 	for i, str := range categories {
-		categories[i] = strings.ToUpper(str)
+		str = strings.ToUpper(str)
+
+		if str == "ALL" {
+			*noCat = true
+			return make([]string, 0)
+		}
+
+		if !allCategories[str] {
+			log.Fatal("Invalid category")
+		}
+
+		categories[i] = str
 	}
 
 	return categories
 }
 
-func GetDates() (Date, Date) {
+func GetDates(noDate *bool) (Date, Date) {
 	dateOptions := map[string]int{
 		"Today":                       0,
 		"Past week":                   1,
@@ -188,6 +221,8 @@ func GetDates() (Date, Date) {
 		endDate.year, _ = strconv.Atoi(stringDate[2])
 
 		print("The following range will be listed: ", sDate, " to ", eDate)
+	case 5:
+		*noDate = true
 	}
 
 	return startDate, endDate

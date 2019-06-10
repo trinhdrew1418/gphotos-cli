@@ -165,11 +165,12 @@ var pushCmd = &cobra.Command{
 			println(fmt.Sprintf("Uploading %d files, %.4g GB", len(filenames), float64(amtBytes)/float64(1<<(10*3))))
 		}
 
-		println("Do you wish to proceed ([y]/n)?")
+		print("Do you wish to proceed ([y]/n)?: ")
 		_, err = fmt.Scan(&answer)
 		if err != nil {
 			log.Fatalf("Unable to read answer")
 		}
+		println()
 
 		if strings.ToLower(answer) != "y" {
 			return

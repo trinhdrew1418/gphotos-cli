@@ -90,7 +90,7 @@ camera type.`,
 		}
 
 		if strings.ToLower(answer) == "y" {
-			FilterFileTypes(&resp.MediaItems)
+			FilterTypes(&resp.MediaItems, "file", sortByFileType)
 		}
 
 		print("Do you want to search by camera types? ([y]/n): ")
@@ -100,7 +100,7 @@ camera type.`,
 		}
 
 		if strings.ToLower(answer) == "y" {
-			FilterCameraTypes(&resp.MediaItems)
+			FilterTypes(&resp.MediaItems, "camera", sortByCameraType)
 		}
 
 		for _, mItem := range resp.MediaItems {
@@ -111,37 +111,13 @@ camera type.`,
 	},
 }
 
-func FilterFileTypes(items *[]*photoslibrary.MediaItem) {
+func FilterTypes(items *[]*photoslibrary.MediaItem, kind string, sorter func(chan *photoslibrary.MediaItem, map[string][]*photoslibrary.MediaItem)) {
 	var answer string
 
 	println("Indexing files...")
 	sortedFiles := *sortFiles(items, sortByFileType)
 
-	println("Here are the available file types: ")
-	for key := range sortedFiles {
-		println(" - ", key)
-	}
-	print("Input which types you'd like to include: ")
-	_, err := fmt.Scan(&answer)
-	if err != nil {
-		log.Fatal("Unable to read response")
-	}
-	var merged []*photoslibrary.MediaItem
-	keys := strings.Split(answer, " ")
-	for _, key := range keys {
-		merged = append(merged, sortedFiles[key]...)
-	}
-
-	items = &merged
-}
-
-func FilterCameraTypes(items *[]*photoslibrary.MediaItem) {
-	var answer string
-
-	println("Indexing files...")
-	sortedFiles := *sortFiles(items, sortByCameraType)
-
-	println("Here are the available camera types: ")
+	println("Here are the available" + kind + "types: ")
 	for key := range sortedFiles {
 		println(" - ", key)
 	}
@@ -160,8 +136,7 @@ func FilterCameraTypes(items *[]*photoslibrary.MediaItem) {
 }
 
 func sortFiles(items *[]*photoslibrary.MediaItem,
-	sorter func(feed chan *photoslibrary.MediaItem,
-		sorted map[string][]*photoslibrary.MediaItem)) *map[string][]*photoslibrary.MediaItem {
+	sorter func(chan *photoslibrary.MediaItem, map[string][]*photoslibrary.MediaItem)) *map[string][]*photoslibrary.MediaItem {
 
 	var sorted map[string][]*photoslibrary.MediaItem
 	feed := make(chan *photoslibrary.MediaItem)

@@ -15,11 +15,13 @@
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/manifoldco/promptui"
 	"github.com/spf13/cobra"
 	"google.golang.org/api/photoslibrary/v1"
 	"log"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -29,6 +31,10 @@ var (
 	startDate  Date
 	endDate    Date
 	categories []string
+)
+
+const (
+	MediaItemsIDLoc = "/src/github.com/trinhdrew1418/gphotos-cli/cache/IDs.json"
 )
 
 type Date struct {
@@ -42,8 +48,7 @@ var listCmd = &cobra.Command{
 	Use:   "list",
 	Short: "Searches your google photos library for qualifying search entries",
 	Long: `Find relevant google photos entries in your library. This command will prompt
-you for photos qualifying photos throughout a specified time range, content type, and
-camera type.`,
+you for photos qualifying photos throughout a specified time range, content type, file type, camera type.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		_, gphotoService := getClientService(photoslibrary.PhotoslibraryScope)
 		var noDate bool
@@ -106,6 +111,28 @@ camera type.`,
 		for _, mItem := range resp.MediaItems {
 			println(mItem.BaseUrl)
 			println()
+		}
+
+		print("Do you want to cache your search request to download at a later time? ([y]/n): ")
+		fmt.Scan(&answer)
+
+		if strings.ToLower(answer) == "y" {
+			f, err := os.OpenFile(os.Getenv("GOPATH")+MediaItemsIDLoc, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600)
+			if err != nil {
+				log.Fatalf("Unable to cache oauth token: %v", err)
+			}
+
+			var IDs []string
+			for _, mItem := range resp.MediaItems {
+				IDs = append(IDs, mItem.Id)
+			}
+
+			defer f.Close()
+			err = json.NewEncoder(f).Encode(IDs)
+			if err != nil {
+				log.Fatal(err)
+			}
+			println("Successfully cached search query")
 		}
 
 	},

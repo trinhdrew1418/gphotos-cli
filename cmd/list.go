@@ -105,7 +105,7 @@ func FilterFileTypes(items *[]*photoslibrary.MediaItem) {
 	var answer string
 
 	println("Indexing files...")
-	sortedFiles := *sortFileTypes(items)
+	sortedFiles := *sortFiles(items, sortByFileType)
 
 	println("Here are the available file types: ")
 	for key := range sortedFiles {
@@ -125,12 +125,39 @@ func FilterFileTypes(items *[]*photoslibrary.MediaItem) {
 	items = &merged
 }
 
-func sortFileTypes(items *[]*photoslibrary.MediaItem) *map[string][]*photoslibrary.MediaItem {
+func FilterCameraTypes(items *[]*photoslibrary.MediaItem) {
+	var answer string
+
+	println("Indexing files...")
+	sortedFiles := *sortFiles(items, sortByCameraType)
+
+	println("Here are the available camera types: ")
+	for key := range sortedFiles {
+		println(" - ", key)
+	}
+	print("Input which types you'd like to include: ")
+	_, err := fmt.Scan(&answer)
+	if err != nil {
+		log.Fatal("Unable to read response")
+	}
+	var merged []*photoslibrary.MediaItem
+	keys := strings.Split(answer, " ")
+	for _, key := range keys {
+		merged = append(merged, sortedFiles[key]...)
+	}
+
+	items = &merged
+}
+
+func sortFiles(items *[]*photoslibrary.MediaItem,
+	sorter func(feed chan *photoslibrary.MediaItem,
+		sorted map[string][]*photoslibrary.MediaItem)) *map[string][]*photoslibrary.MediaItem {
+
 	var sorted map[string][]*photoslibrary.MediaItem
 	feed := make(chan *photoslibrary.MediaItem)
 
 	for i := 0; i < MAX_WORKERS; i++ {
-		go sortByFile(feed, sorted)
+		go sorter(feed, sorted)
 	}
 
 	for _, mItem := range *items {
@@ -140,12 +167,23 @@ func sortFileTypes(items *[]*photoslibrary.MediaItem) *map[string][]*photoslibra
 	return &sorted
 }
 
-func sortByFile(feed chan *photoslibrary.MediaItem, sorted map[string][]*photoslibrary.MediaItem) {
+func sortByFileType(feed chan *photoslibrary.MediaItem, sorted map[string][]*photoslibrary.MediaItem) {
 	defer close(feed)
 
 	for mItem := range feed {
 		val := sorted[strings.Split(mItem.MimeType, "/")[1]]
 		val = append(val, mItem)
+		sorted[strings.Split(mItem.MimeType, "/")[1]] = val
+	}
+}
+
+func sortByCameraType(feed chan *photoslibrary.MediaItem, sorted map[string][]*photoslibrary.MediaItem) {
+	defer close(feed)
+
+	for mItem := range feed {
+		val := sorted[mItem.MediaMetadata.Photo.CameraMake+" "+mItem.MediaMetadata.Photo.CameraModel]
+		val = append(val, mItem)
+		sorted[mItem.MediaMetadata.Photo.CameraMake+" "+mItem.MediaMetadata.Photo.CameraModel] = val
 	}
 }
 

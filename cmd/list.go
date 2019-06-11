@@ -93,6 +93,16 @@ camera type.`,
 			FilterFileTypes(&resp.MediaItems)
 		}
 
+		print("Do you want to search by camera types? ([y]/n): ")
+		_, err = fmt.Scan(&answer)
+		if err != nil {
+			log.Fatal("Unable to read answer")
+		}
+
+		if strings.ToLower(answer) == "y" {
+			FilterCameraTypes(&resp.MediaItems)
+		}
+
 		for _, mItem := range resp.MediaItems {
 			println(mItem.BaseUrl)
 			println()

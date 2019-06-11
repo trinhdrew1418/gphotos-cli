@@ -48,6 +48,7 @@ camera type.`,
 		_, gphotoService := getClientService(photoslibrary.PhotoslibraryScope)
 		var noDate bool
 		var noCat bool
+		var answer string
 
 		startDate, endDate = GetDates(&noDate)
 		println()
@@ -82,12 +83,70 @@ camera type.`,
 		if err != nil {
 			log.Fatal("Failed media search")
 		}
+		print("Do you want to search by filetype? ([y]/n): ")
+		_, err = fmt.Scan(&answer)
+		if err != nil {
+			log.Fatal("Unable to read answer")
+		}
+
+		if strings.ToLower(answer) == "y" {
+			FilterFileTypes(&resp.MediaItems)
+		}
+
 		for _, mItem := range resp.MediaItems {
 			println(mItem.BaseUrl)
 			println()
 		}
 
 	},
+}
+
+func FilterFileTypes(items *[]*photoslibrary.MediaItem) {
+	var answer string
+
+	println("Indexing files...")
+	sortedFiles := *sortFileTypes(items)
+
+	println("Here are the available file types: ")
+	for key := range sortedFiles {
+		println(" - ", key)
+	}
+	print("Input which types you'd like to include: ")
+	_, err := fmt.Scan(&answer)
+	if err != nil {
+		log.Fatal("Unable to read response")
+	}
+	var merged []*photoslibrary.MediaItem
+	keys := strings.Split(answer, " ")
+	for _, key := range keys {
+		merged = append(merged, sortedFiles[key]...)
+	}
+
+	items = &merged
+}
+
+func sortFileTypes(items *[]*photoslibrary.MediaItem) *map[string][]*photoslibrary.MediaItem {
+	var sorted map[string][]*photoslibrary.MediaItem
+	feed := make(chan *photoslibrary.MediaItem)
+
+	for i := 0; i < MAX_WORKERS; i++ {
+		go sortByFile(feed, sorted)
+	}
+
+	for _, mItem := range *items {
+		feed <- mItem
+	}
+
+	return &sorted
+}
+
+func sortByFile(feed chan *photoslibrary.MediaItem, sorted map[string][]*photoslibrary.MediaItem) {
+	defer close(feed)
+
+	for mItem := range feed {
+		val := sorted[strings.Split(mItem.MimeType, "/")[1]]
+		val = append(val, mItem)
+	}
 }
 
 func GetCategories(noCat *bool) []string {

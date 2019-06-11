@@ -15,7 +15,12 @@
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
+	"google.golang.org/api/photoslibrary/v1"
+	"log"
+	"os"
+	"strings"
 
 	"github.com/spf13/cobra"
 )
@@ -31,8 +36,53 @@ Cobra is a CLI library for Go that empowers applications.
 This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("pull called")
+		exists := existsCache()
+		var mediaItemIDs []string
+		var answer string
+		_, gphotoService := getClientService(photoslibrary.PhotoslibraryScope
+
+		if exists {
+			print("Detected cached search query, do you want to download files from this? ([y]/n)")
+			_, err :=fmt.Scan(&answer)
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			if strings.ToLower(answer) == "y" {
+				f, err := os.Open(os.Getenv("GOPATH") + MediaItemsIDLoc)
+				if err != nil {
+					log.Fatal("Unable to open file for some reason")
+				}
+
+				defer f.Close()
+				err = json.NewDecoder(f).Decode(mediaItemIDs)
+				if err != nil {
+					log.Fatal("Unable to decode json")
+				}
+			} else {
+				// delete the file
+			}
+		}
+
+		if len(mediaItemIDs) > 0 {
+			for _, id := range mediaItemIDs {
+				resp, err := gphotoService.MediaItems.Get(id).Do()
+				if resp != nil {
+					downloadLink := resp.BaseUrl + "-d"
+				}
+			}
+
+			return
+		}
+
+		//go through prompts
+
+
 	},
+}
+
+func existsCache() bool {
+	// does
 }
 
 func init() {

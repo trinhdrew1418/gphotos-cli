@@ -15,12 +15,15 @@
 package cmd
 
 import (
-	"encoding/json"
 	"fmt"
 	"github.com/manifoldco/promptui"
+	"github.com/trinhdrew1418/gphotos-cli/utils"
+	"github.com/trinhdrew1418/gphotos-cli/utils/expobackoff"
 	"google.golang.org/api/photoslibrary/v1"
 	"log"
+	"net/http"
 	"os"
+	"path"
 	"strconv"
 	"strings"
 	"time"
@@ -31,6 +34,17 @@ import (
 var (
 	DownloadDir string
 )
+
+type Date struct {
+	day   int
+	month int
+	year  int
+}
+
+type DownloadTask struct {
+	url      string
+	location string
+}
 
 // pullCmd represents the pull command
 var pullCmd = &cobra.Command{
@@ -43,13 +57,18 @@ Cobra is a CLI library for Go that empowers applications.
 This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
 	Run: func(cmd *cobra.Command, args []string) {
+		if !utils.IsDir(DownloadDir) {
+			println("You provided an invalid download directory")
+			os.Exit(1)
+		}
+
 		_, gphotoService := getClientService(photoslibrary.PhotoslibraryScope)
 		var noDate bool
 		var noCat bool
 
-		startDate, endDate = GetDates(&noDate)
+		startDate, endDate := GetDates(&noDate)
 		println()
-		categories = GetCategories(&noCat)
+		categories := GetCategories(&noCat)
 		println()
 
 		filt := photoslibrary.Filters{}
@@ -81,7 +100,69 @@ to quickly create a Cobra application.`,
 			log.Fatal("Failed media search")
 		}
 
+		dTaskFeed := make(chan DownloadTask)
+		feedPage(resp, dTaskFeed)
+		for resp.NextPageToken != "" {
+			req := gphotoService.MediaItems.Search(&photoslibrary.SearchMediaItemsRequest{PageToken: resp.NextPageToken}).Do
+			resp, err = req()
+
+			if err != nil || resp.HTTPStatusCode == 429 {
+				durations := expobackoff.Calculate(expobackoff.NUM_RETRIES)
+				for _, sleepDur := range durations {
+					duration := time.Duration(sleepDur)
+					time.Sleep(duration)
+					resp, err = req()
+					if err == nil && resp.HTTPStatusCode == 200 {
+						break
+					}
+				}
+				println("Unable to get next page")
+				os.Exit(1)
+			}
+
+			feedPage(resp, dTaskFeed)
+		}
 	},
+}
+
+func guaranteeDirectory(mItem *photoslibrary.MediaItem) (string, error) {
+	creationParts := strings.Split(mItem.MediaMetadata.CreationTime, "-")
+	year := creationParts[0]
+	month := creationParts[1]
+	loc := path.Join(DownloadDir, year, month)
+	err := os.MkdirAll(loc, os.ModePerm)
+	return loc, err
+}
+
+func feedPage(resp *photoslibrary.SearchMediaItemsResponse, dTaskFeed chan DownloadTask) {
+	for _, mItem := range resp.MediaItems {
+		dest, err := guaranteeDirectory(mItem)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		dTaskFeed <- DownloadTask{path.Join(mItem.BaseUrl, "-d"), dest}
+	}
+}
+
+func initDownloads(dTaskFeed chan DownloadTask) {
+	for i := 0; i < MAX_WORKERS; i++ {
+		go Downloader(dTaskFeed)
+	}
+}
+
+func Downloader(dTaskFeed chan DownloadTask) {
+	defer close(dTaskFeed)
+
+	for task := range dTaskFeed {
+		resp, err := http.Get(task.url)
+		for err != nil {
+			println("Download failed", resp.StatusCode)
+			os.Exit(1)
+		}
+		defer resp.Body.Close()
+
+	}
 }
 
 func GetCategories(noCat *bool) []string {
@@ -249,25 +330,11 @@ func getSomeDaysAgo(num int) Date {
 }
 
 func init() {
-	rootCmd.AddCommand(listCmd)
-
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// listCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// listCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
-}
-
-func init() {
 	rootCmd.AddCommand(pullCmd)
 
 	// Here you will define your flags and configuration settings.
 
-	pullCmd.PersistentFlags().StringVar(&DownloadDir, "download directory path", ".", "Define the directory you want to download your files to")
+	pullCmd.PersistentFlags().StringVar(&DownloadDir, "download directory path", "./", "Define the directory you want to download your files to")
 
 	// Cobra supports Persistent Flags which will work for this command
 	// and all subcommands, e.g.:

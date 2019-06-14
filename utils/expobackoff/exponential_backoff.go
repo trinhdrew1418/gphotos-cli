@@ -11,6 +11,9 @@ import (
 const EXPO_LIM = 9
 const NUM_RETRIES = 20
 
+type Response interface {
+}
+
 func Calculate(num_retries int) []time.Duration {
 	retryDurations := make([]time.Duration, num_retries)
 

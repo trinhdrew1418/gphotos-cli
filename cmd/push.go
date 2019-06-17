@@ -57,9 +57,9 @@ type UploadInfo struct {
 var pushCmd = &cobra.Command{
 	Use:   "push",
 	Short: "Upload files",
-	Long:  "TODO",
+	Long: "Uploads files and folders to your google photos library and/or specified" +
+		"google photos album",
 	Run: func(cmd *cobra.Command, args []string) {
-		//TODO: display some help shit (same message as Long preferably)
 		if len(args) < 1 {
 			fmt.Println("Please give an argument")
 			return

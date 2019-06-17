@@ -58,7 +58,6 @@ func init() {
 	// will be global for your application.
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.gphotos-cli.yaml)")
 	rootCmd.PersistentFlags().StringVarP(&workingAlbum, "album", "a", "", "Define the album you want to work in")
-	rootCmd.PersistentFlags().BoolVarP(&selectAlbum, "select album", "s", false, "Select the album you want to do work in")
 
 	// Cobra also supports local flags, which will only run
 	// when this action is called directly.

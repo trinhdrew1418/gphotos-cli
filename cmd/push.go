@@ -308,6 +308,7 @@ func init() {
 	// pushCmd.PersistentFlags().String("foo", "", "A help for foo")
 	pushCmd.PersistentFlags().BoolVarP(&recursive, "recursive", "r", false, "Recursively select files to be uploaded from directories")
 	pushCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Print out uploaded files")
+	pushCmd.PersistentFlags().BoolVarP(&selectAlbum, "select", "s", false, "Select the album you want to do work in")
 
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:

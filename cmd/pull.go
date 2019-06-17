@@ -55,12 +55,15 @@ var pullCmd = &cobra.Command{
 	Aliases:    nil,
 	SuggestFor: nil,
 	Short:      "A brief description of your command",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
+	Long: `Downloads specified portions of your google photos library onto your machine. It will
+		query you for a desired timeframe of desired photos and desired categories if any. It will download
+		into the current calling directory unless otherwise specified by the "-d" flag. The files will
+		downloaded as the following directory tree pattern:
 
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+			YEAR
+			|	MONTH
+			|	|	DAY-TIMESTAMP.FILEXT`,
+
 	Example:                "",
 	ValidArgs:              nil,
 	Args:                   nil,
@@ -209,34 +212,21 @@ func downloader(dTaskFeed *chan DownloadTask) {
 }
 
 func GetCategories(noCat *bool) []string {
-	allCategories := map[string]bool{
-		"ANIMALS":      true,
-		"LANDMARKS":    true,
-		"PETS":         true,
-		"UTILITY":      true,
-		"BIRTHDAYS":    true,
-		"LANDSCAPES":   true,
-		"RECEIPTS":     true,
-		"WEDDINGS":     true,
-		"CITYSCAPES":   true,
-		"NIGHT":        true,
-		"SCREENSHOTS":  true,
-		"WHITEBOARDS":  true,
-		"DOCUMENTS":    true,
-		"PEOPLE":       true,
-		"SELFIES":      true,
-		"FOOD":         true,
-		"PERFORMANCES": true,
-		"SPORT":        true}
+	allCategories := []string{
+		"ANIMALS", "LANDMARKS", "PETS", "UTILITY", "BIRTHDAYS", "LANDSCAPES",
+		"RECEIPTS", "WEDDINGS", "CITYSCAPES", "NIGHT", "SCREENSHOTS", "WHITEBOARDS",
+		"ARTS", "CRAFTS", "FASHION", "DOCUMENTS", "PEOPLE", "SELFIES", "HOUSES", "GARDENS",
+		"FLOWERS", "HOLIDAYS", "TRAVEL", "FOOD", "PERFORMANCES", "SPORT",
+	}
 
 	println("Here are the available categories: ")
-	for cat := range allCategories {
-		println(" - ", cat)
+	println("(0) ANY")
+	for i, cat := range allCategories {
+		println("("+strconv.Itoa(i+1)+")", cat)
 	}
-	println(" - ALL")
 
 	var parseString string
-	print("Select up to 10 categories (ALL if you want any) [capital or lowercase, separate by spaces]: ")
+	print("Select up to 10 categories [numbers separate by spaces] (ie. 1 4 5 8): ")
 	_, err := fmt.Scan(&parseString)
 	if err != nil {
 		log.Fatal("Unable to obtain categories")
@@ -248,18 +238,14 @@ func GetCategories(noCat *bool) []string {
 	}
 
 	for i, str := range categories {
-		str = strings.ToUpper(str)
+		entry, _ := strconv.Atoi(str)
 
-		if str == "ALL" {
+		if entry == 0 {
 			*noCat = true
 			return make([]string, 0)
 		}
 
-		if !allCategories[str] {
-			log.Fatal("Invalid category")
-		}
-
-		categories[i] = str
+		categories[i] = allCategories[entry-1]
 	}
 
 	return categories

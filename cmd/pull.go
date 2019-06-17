@@ -19,7 +19,9 @@ import (
 	"github.com/manifoldco/promptui"
 	"github.com/trinhdrew1418/gphotos-cli/utils"
 	"github.com/trinhdrew1418/gphotos-cli/utils/expobackoff"
+	"github.com/trinhdrew1418/gphotos-cli/utils/progressbar"
 	"google.golang.org/api/photoslibrary/v1"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -44,18 +46,34 @@ type Date struct {
 type DownloadTask struct {
 	url      string
 	location string
+	filename string
 }
 
 // pullCmd represents the pull command
 var pullCmd = &cobra.Command{
-	Use:   "pull",
-	Short: "A brief description of your command",
+	Use:        "pull",
+	Aliases:    nil,
+	SuggestFor: nil,
+	Short:      "A brief description of your command",
 	Long: `A longer description that spans multiple lines and likely contains examples
 and usage of using your command. For example:
 
 Cobra is a CLI library for Go that empowers applications.
 This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
+	Example:                "",
+	ValidArgs:              nil,
+	Args:                   nil,
+	ArgAliases:             nil,
+	BashCompletionFunction: "",
+	Deprecated:             "",
+	Hidden:                 false,
+	Annotations:            nil,
+	Version:                "",
+	PersistentPreRun:       nil,
+	PersistentPreRunE:      nil,
+	PreRun:                 nil,
+	PreRunE:                nil,
 	Run: func(cmd *cobra.Command, args []string) {
 		if !utils.IsDir(DownloadDir) {
 			println("You provided an invalid download directory")
@@ -101,9 +119,17 @@ to quickly create a Cobra application.`,
 		}
 
 		dTaskFeed := make(chan DownloadTask)
+
+		for i := 0; i < MAX_WORKERS; i++ {
+			go downloader(&dTaskFeed)
+		}
+
+		currTotal := int64(len(resp.MediaItems))
+		pbar = *progressbar.Make(currTotal)
 		feedPage(resp, dTaskFeed)
+
 		for resp.NextPageToken != "" {
-			req := gphotoService.MediaItems.Search(&photoslibrary.SearchMediaItemsRequest{PageToken: resp.NextPageToken}).Do
+			req := gphotoService.MediaItems.Search(&photoslibrary.SearchMediaItemsRequest{Filters: &filt, PageToken: resp.NextPageToken}).Do
 			resp, err = req()
 
 			if err != nil || resp.HTTPStatusCode == 429 {
@@ -120,48 +146,65 @@ to quickly create a Cobra application.`,
 				os.Exit(1)
 			}
 
+			currTotal += int64(len(resp.MediaItems))
+			pbar.SetTotal(currTotal, false)
 			feedPage(resp, dTaskFeed)
 		}
-	},
-}
 
-func guaranteeDirectory(mItem *photoslibrary.MediaItem) (string, error) {
-	creationParts := strings.Split(mItem.MediaMetadata.CreationTime, "-")
-	year := creationParts[0]
-	month := creationParts[1]
-	loc := path.Join(DownloadDir, year, month)
-	err := os.MkdirAll(loc, os.ModePerm)
-	return loc, err
+		close(dTaskFeed)
+	},
+	RunE:                       nil,
+	PostRun:                    nil,
+	PostRunE:                   nil,
+	PersistentPostRun:          nil,
+	PersistentPostRunE:         nil,
+	SilenceErrors:              false,
+	SilenceUsage:               false,
+	DisableFlagParsing:         false,
+	DisableAutoGenTag:          false,
+	DisableFlagsInUseLine:      false,
+	DisableSuggestions:         false,
+	SuggestionsMinimumDistance: 0,
+	TraverseChildren:           false,
+	FParseErrWhitelist:         cobra.FParseErrWhitelist{},
 }
 
 func feedPage(resp *photoslibrary.SearchMediaItemsResponse, dTaskFeed chan DownloadTask) {
 	for _, mItem := range resp.MediaItems {
-		dest, err := guaranteeDirectory(mItem)
+		creationParts := strings.Split(mItem.MediaMetadata.CreationTime, "-")
+		year := creationParts[0]
+		month := creationParts[1]
+
+		loc := path.Join(DownloadDir, year, month)
+		err := os.MkdirAll(loc, os.ModePerm)
 		if err != nil {
 			log.Fatal(err)
 		}
 
-		dTaskFeed <- DownloadTask{path.Join(mItem.BaseUrl, "-d"), dest}
+		filename := creationParts[2] + "." + strings.Split(mItem.MimeType, "/")[1]
+		dTaskFeed <- DownloadTask{mItem.BaseUrl + "=d", loc, filename}
 	}
 }
 
-func initDownloads(dTaskFeed chan DownloadTask) {
-	for i := 0; i < MAX_WORKERS; i++ {
-		go Downloader(dTaskFeed)
-	}
-}
-
-func Downloader(dTaskFeed chan DownloadTask) {
-	defer close(dTaskFeed)
-
-	for task := range dTaskFeed {
+func downloader(dTaskFeed *chan DownloadTask) {
+	for task := range *dTaskFeed {
 		resp, err := http.Get(task.url)
-		for err != nil {
+		if err != nil {
 			println("Download failed", resp.StatusCode)
 			os.Exit(1)
 		}
-		defer resp.Body.Close()
 
+		defer resp.Body.Close()
+		f, err := os.Create(path.Join(task.location, task.filename))
+
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		defer f.Close()
+
+		_, err = io.Copy(f, resp.Body)
+		pbar.Increment()
 	}
 }
 
@@ -187,7 +230,7 @@ func GetCategories(noCat *bool) []string {
 		"SPORT":        true}
 
 	println("Here are the available categories: ")
-	for _, cat := range allCategories {
+	for cat := range allCategories {
 		println(" - ", cat)
 	}
 	println(" - ALL")

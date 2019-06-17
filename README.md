@@ -8,7 +8,7 @@ and mass uploads.
 * Parallelized transfers
 * Filtering by date and category type for downloads
 * Album creation
-* Uploads to designated albums (can only upload to albums created by this app due Google's API limitations)
+* Uploads to designated albums (can only upload to albums created by this app due to Google's API limitations)
 * Exponential backoff for large uploads and downloads
 
 # Installation
@@ -88,3 +88,4 @@ concurrent requests for pages whilst downloading whats available.
 * Mass moving existing photos to albums
 * Search by metadata: specific filetypes, camera types, etc.
 * Add options to change the max amount of parallel threads
+* Proper error handling

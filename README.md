@@ -21,37 +21,33 @@ Before usage, you first need to grant the application account authorization:
 
 `gphotos-cli init`
 
-# Usage
-## `init`
+# Commands
+### `init`
 
 This initializes the authorization token needed to access your account
 
 `gphotos-cli init`
 
-## `push`
+### `push`
 
 Command to upload files to your google photos library.
 
 `gphotos-cli push [-OPTIONS] [FILE 1] [FOLDER 1] ...`
 
-
 Here are the available options:
 
 * `-r` or `--recursive`
-
-Recursively traverses folders in arguments for file uploads
+    Recursively traverses folders in arguments for file uploads
 
 * `-s` or `--select`
-
-Pulls up a menu to select available albums from to upload to. NOTE: you can ONLY upload to
-albums that you've created through this app. This is a limitation of the google photos api.
+    Pulls up a menu to select available albums from to upload to. NOTE: you can ONLY upload to
+    albums that you've created through this app. This is a limitation of the google photos api.
 
 * `-v` or `--verbose`
+    This lists out all of the files you'll be uploading. Useful if you want to know which files have
+    valid extensions.
 
-This lists out all of the files you'll be uploading. Useful if you want to know which files have
-valid extensions.
-
-## `pull`
+### `pull`
 
 Command to download files
 
@@ -60,13 +56,41 @@ Command to download files
 Follow the prompts to select your filters. It will download your files into folders separated by year and month. Each
 file will be named with its day of creation and time.
 
+You can filter up to 10 of the following categories:
+
+* animals
+* landmarks
+* pets
+* utility
+* birthdays
+* landscapes
+* receipts
+* weddings
+* cityscapes
+* night
+* screenshots
+* whiteboards
+* arts
+* crafts
+* fashion
+* documents
+* people
+* selfies
+* houses
+* gardens
+* flowers
+* holidays
+* travel
+* food
+* performances
+* sport
+
 Here are the available options:
 
 * `-d [PATH]`
+    define the directory path you want to download your files to.
 
-define the directory path you want to download your files to.
-
-## `albums`
+### `albums`
 
 Create albums by calling
 
@@ -82,7 +106,7 @@ More subcommands coming later.
 requests and instead of waiting for possibly several page requests for the full download request, it is faster to
 concurrently do requests for pages whilst downloading what's available. The current default page size is 25.
 
-#### TODOs
+## TODOs
 
 * More convenient credential replacement using `init`
 * Mass moving existing photos to albums

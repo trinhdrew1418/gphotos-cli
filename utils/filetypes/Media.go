@@ -41,6 +41,8 @@ var VideoTypes = map[string]bool{
 	"mkv":  true,
 }
 
+var MimeTypeExtensions = map[string]bool{}
+
 func IsImage(filename string) bool {
 	return isMediaType(filename, ImageTypes)
 }

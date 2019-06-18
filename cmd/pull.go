@@ -20,6 +20,7 @@ import (
 	"github.com/trinhdrew1418/gphotos-cli/utils"
 	"github.com/trinhdrew1418/gphotos-cli/utils/expobackoff"
 	"github.com/trinhdrew1418/gphotos-cli/utils/progressbar"
+	"github.com/trinhdrew1418/gphotos-cli/utils/retrievers"
 	"google.golang.org/api/photoslibrary/v1"
 	"io"
 	"log"
@@ -90,41 +91,55 @@ var pullCmd = &cobra.Command{
 		}
 
 		_, gphotoService := getClientService(photoslibrary.PhotoslibraryScope)
-		var noDate bool
-		var noCat bool
 
-		startDate, endDate := GetDates(&noDate)
-		println()
-		categories := GetCategories(&noCat)
-		println()
+		var (
+			noDate  bool
+			noCat   bool
+			albumID string
+		)
 
-		filt := photoslibrary.Filters{}
-		if !noCat {
-			filt.ContentFilter = &photoslibrary.ContentFilter{IncludedContentCategories: categories}
-		}
+		searchMediaReq := photoslibrary.SearchMediaItemsRequest{}
 
-		if !noDate {
-			filt.DateFilter = &photoslibrary.DateFilter{
-				Ranges: []*photoslibrary.DateRange{
-					{
-						StartDate: &photoslibrary.Date{
-							Day:   int64(startDate.day),
-							Month: int64(startDate.month),
-							Year:  int64(startDate.year),
-						},
-						EndDate: &photoslibrary.Date{
-							Day:   int64(endDate.day),
-							Month: int64(endDate.month),
-							Year:  int64(endDate.year),
+		if selectAlbum {
+			albumID = GetAlbum(gphotoService)
+			searchMediaReq.AlbumId = albumID
+		} else {
+			filt := photoslibrary.Filters{}
+
+			startDate, endDate := GetDates(&noDate)
+			println()
+			categories := GetCategories(&noCat)
+			println()
+
+			if !noCat {
+				filt.ContentFilter = &photoslibrary.ContentFilter{IncludedContentCategories: categories}
+			}
+
+			if !noDate {
+				filt.DateFilter = &photoslibrary.DateFilter{
+					Ranges: []*photoslibrary.DateRange{
+						{
+							StartDate: &photoslibrary.Date{
+								Day:   int64(startDate.day),
+								Month: int64(startDate.month),
+								Year:  int64(startDate.year),
+							},
+							EndDate: &photoslibrary.Date{
+								Day:   int64(endDate.day),
+								Month: int64(endDate.month),
+								Year:  int64(endDate.year),
+							},
 						},
 					},
-				},
+				}
 			}
+
+			searchMediaReq.Filters = &filt
 		}
 
-		resp, err := gphotoService.MediaItems.Search(&photoslibrary.SearchMediaItemsRequest{Filters: &filt}).Do()
+		resp, err := gphotoService.MediaItems.Search(&searchMediaReq).Do()
 		if err != nil {
-			log.Fatal("Failed media search")
+			log.Fatal("Failed media search", err)
 		}
 
 		dTaskFeed := make(chan DownloadTask)
@@ -136,11 +151,12 @@ var pullCmd = &cobra.Command{
 		}
 
 		currTotal := int64(len(resp.MediaItems))
-		pbar = *progressbar.Make(currTotal)
+		p, pbar = progressbar.Make(currTotal)
 		feedPage(resp, dTaskFeed)
 
 		for resp.NextPageToken != "" {
-			req := gphotoService.MediaItems.Search(&photoslibrary.SearchMediaItemsRequest{Filters: &filt, PageToken: resp.NextPageToken}).Do
+			searchMediaReq.PageToken = resp.NextPageToken
+			req := gphotoService.MediaItems.Search(&searchMediaReq).Do
 			resp, err = req()
 
 			if err != nil || resp.HTTPStatusCode == 429 {
@@ -164,6 +180,8 @@ var pullCmd = &cobra.Command{
 
 		close(dTaskFeed)
 		wg.Wait()
+		p.Wait()
+		println("Complete")
 	},
 	RunE:                       nil,
 	PostRun:                    nil,
@@ -184,13 +202,16 @@ var pullCmd = &cobra.Command{
 func feedPage(resp *photoslibrary.SearchMediaItemsResponse, dTaskFeed chan DownloadTask) {
 	for _, mItem := range resp.MediaItems {
 		creationParts := strings.Split(mItem.MediaMetadata.CreationTime, "-")
-		year := creationParts[0]
-		month := creationParts[1]
+		loc := DownloadDir
+		if !selectAlbum {
+			year := creationParts[0]
+			month := creationParts[1]
 
-		loc := path.Join(DownloadDir, year, month)
-		err := os.MkdirAll(loc, os.ModePerm)
-		if err != nil {
-			log.Fatal(err)
+			loc = path.Join(DownloadDir, year, month)
+			err := os.MkdirAll(loc, os.ModePerm)
+			if err != nil {
+				log.Fatal(err)
+			}
 		}
 
 		extensions, _ := mime.ExtensionsByType(mItem.MimeType)
@@ -208,17 +229,59 @@ func downloader(dTaskFeed *chan DownloadTask, wg *sync.WaitGroup) {
 			log.Fatal(err)
 		}
 
-		defer resp.Body.Close()
 		f, err := os.Create(path.Join(task.location, task.filename))
 
 		if err != nil {
 			log.Fatal(err)
 		}
 
-		defer f.Close()
-
 		_, err = io.Copy(f, resp.Body)
+
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		resp.Body.Close()
+		f.Close()
+
 		pbar.Increment()
+	}
+}
+
+func GetAlbum(serv *photoslibrary.Service) string {
+	if !selectAlbum {
+		return ""
+	}
+
+	albumToID := *retrievers.GetAlbumsToID(serv, false)
+	if len(albumToID) >= 1 {
+		titles := make([]string, len(albumToID))
+		i := 0
+		for k := range albumToID {
+			titles[i] = k
+			i++
+		}
+		prompt := promptui.Select{
+			Label: "Select album",
+			Items: titles,
+		}
+
+		_, workingAlbum, err := prompt.Run()
+
+		if err != nil {
+			log.Fatalln(err)
+		}
+
+		DownloadDir = path.Join(DownloadDir, workingAlbum)
+		err = os.MkdirAll(DownloadDir, os.ModePerm)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		return albumToID[workingAlbum]
+	} else {
+		println("No readable albums")
+		return ""
 	}
 }
 
@@ -326,6 +389,10 @@ func GetDates(noDate *bool) (Date, Date) {
 		for len(stringDate) != 3 {
 			print("Incorrect format, please try again [MM-DD-YYYY]: ")
 			_, err = fmt.Scan(&sDate)
+			if err != nil {
+				log.Fatal("Unable to read response")
+			}
+
 			stringDate = strings.Split(sDate, "-")
 		}
 
@@ -343,6 +410,9 @@ func GetDates(noDate *bool) (Date, Date) {
 		for len(stringDate) != 3 {
 			print("Incorrect format, please try again [MM-DD-YYYY]: ")
 			_, err = fmt.Scan(&eDate)
+			if err != nil {
+				log.Fatal("Unable to read response")
+			}
 			stringDate = strings.Split(eDate, "-")
 		}
 
@@ -391,8 +461,8 @@ func init() {
 
 	// Here you will define your flags and configuration settings.
 
-	pullCmd.PersistentFlags().StringVar(&DownloadDir, "download directory path", "./", "Define the directory you want to download your files to")
-
+	pullCmd.PersistentFlags().StringVar(&DownloadDir, "directory", "./", "Define the directory you want to download your files to")
+	pullCmd.PersistentFlags().BoolVarP(&selectAlbum, "select", "s", false, "Pull up the album selection menu to download from")
 	// Cobra supports Persistent Flags which will work for this command
 	// and all subcommands, e.g.:
 	// pullCmd.PersistentFlags().String("foo", "", "A help for foo")

@@ -38,13 +38,14 @@ import (
 const (
 	apiVer      = "v1"
 	basePath    = "https://photoslibrary.googleapis.com/"
-	MAX_WORKERS = 4
+	MAX_WORKERS = 5
 )
 
 var (
 	recursive      bool
 	verbose        bool
-	pbar           mpb.Bar
+	pbar           *mpb.Bar
+	p              *mpb.Progress
 	failedToUpload []string
 )
 
@@ -85,8 +86,6 @@ var pushCmd = &cobra.Command{
 			log.Fatalf("Unable to retrieve google photos service: %v", err)
 		}
 
-		var album string
-
 		if selectAlbum && workingAlbum != "" {
 			println("Can only either use the album select or declare an album destination, not both")
 			return
@@ -97,7 +96,7 @@ var pushCmd = &cobra.Command{
 		}
 
 		if selectAlbum {
-			albumToID := *retrievers.GetAlbumsToID(gphotoServ)
+			albumToID := *retrievers.GetAlbumsToID(gphotoServ, true)
 
 			if len(albumToID) >= 1 {
 				titles := make([]string, len(albumToID))
@@ -111,12 +110,12 @@ var pushCmd = &cobra.Command{
 					Items: titles,
 				}
 
-				_, album, err = prompt.Run()
+				_, workingAlbum, err = prompt.Run()
 
 				if err != nil {
 					log.Fatalln(err)
 				}
-				workingAlbumID = albumToID[album]
+				workingAlbumID = albumToID[workingAlbum]
 			} else {
 				println("No writable albums")
 			}
@@ -146,7 +145,7 @@ var pushCmd = &cobra.Command{
 		var answer string
 		if verbose {
 			if workingAlbum != "" {
-				fmt.Println("Uploading the following files to " + album + ":")
+				fmt.Println("Uploading the following files to " + workingAlbum + ":")
 			} else {
 				fmt.Println("Uploading the following files:")
 			}
@@ -176,7 +175,7 @@ var pushCmd = &cobra.Command{
 			return
 		}
 
-		pbar = *progressbar.Make(int64(len(filenames)))
+		p, pbar = progressbar.Make(int64(len(filenames)))
 		pushFiles(gphotoServ, client, filenames)
 
 		if len(failedToUpload) > 0 {

@@ -5,11 +5,15 @@ import (
 	"log"
 )
 
-func GetAlbumsToID(s *photoslibrary.Service) *map[string]string {
+func GetAlbumsToID(s *photoslibrary.Service, write bool) *map[string]string {
 	albumMap := *makeAlbumMap(s)
 	albumToID := make(map[string]string)
 	for title := range albumMap {
-		if albumMap[title].IsWriteable {
+		if write {
+			if albumMap[title].IsWriteable {
+				albumToID[title] = albumMap[title].Id
+			}
+		} else {
 			albumToID[title] = albumMap[title].Id
 		}
 	}

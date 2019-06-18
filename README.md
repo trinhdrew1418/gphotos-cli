@@ -89,6 +89,12 @@ Here are the available options:
 
 * `-d [PATH]`
     define the directory path you want to download your files to.
+    
+* `-s` or `--select`
+    pull up a selection menu of albums to download instead. The files will be downloading
+    into a folder of the name of the album. The files will not be organized further beyond
+    this. As a limitation of the API, filtering in conjunction with an album request is 
+    not possible.
 
 ### `albums`
 
@@ -121,4 +127,4 @@ Some of these packages were a huge help; either directly, as reference code, or 
 * More convenient credential replacement using `init`
 * Mass moving existing photos to albums
 * Search by metadata: specific filetypes, camera types, etc.
-
+* Using compression for faster transfers

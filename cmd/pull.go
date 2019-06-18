@@ -23,11 +23,13 @@ import (
 	"google.golang.org/api/photoslibrary/v1"
 	"io"
 	"log"
+	"mime"
 	"net/http"
 	"os"
 	"path"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -122,9 +124,11 @@ var pullCmd = &cobra.Command{
 		}
 
 		dTaskFeed := make(chan DownloadTask)
+		var wg sync.WaitGroup
 
 		for i := 0; i < MAX_WORKERS; i++ {
-			go downloader(&dTaskFeed)
+			wg.Add(1)
+			go downloader(&dTaskFeed, &wg)
 		}
 
 		currTotal := int64(len(resp.MediaItems))
@@ -155,6 +159,7 @@ var pullCmd = &cobra.Command{
 		}
 
 		close(dTaskFeed)
+		wg.Wait()
 	},
 	RunE:                       nil,
 	PostRun:                    nil,
@@ -184,12 +189,15 @@ func feedPage(resp *photoslibrary.SearchMediaItemsResponse, dTaskFeed chan Downl
 			log.Fatal(err)
 		}
 
-		filename := creationParts[2] + "." + strings.Split(mItem.MimeType, "/")[1]
+		extensions, _ := mime.ExtensionsByType(mItem.MimeType)
+		filename := creationParts[2] + extensions[0]
 		dTaskFeed <- DownloadTask{mItem.BaseUrl + "=d", loc, filename}
 	}
 }
 
-func downloader(dTaskFeed *chan DownloadTask) {
+func downloader(dTaskFeed *chan DownloadTask, wg *sync.WaitGroup) {
+	defer wg.Done()
+
 	for task := range *dTaskFeed {
 		resp, err := http.Get(task.url)
 		if err != nil {
@@ -219,11 +227,12 @@ func GetCategories(noCat *bool) []string {
 		"FLOWERS", "HOLIDAYS", "TRAVEL", "FOOD", "PERFORMANCES", "SPORT",
 	}
 
-	println("Here are the available categories: ")
+	println("Here are the available categories: \n")
 	println("(0) ANY")
 	for i, cat := range allCategories {
 		println("("+strconv.Itoa(i+1)+")", cat)
 	}
+	println()
 
 	var parseString string
 	print("Select up to 10 categories [numbers separate by spaces] (ie. 1 4 5 8): ")
@@ -301,30 +310,43 @@ func GetDates(noDate *bool) (Date, Date) {
 		var sDate string
 		var eDate string
 
-		print("Start Date [MM-DD-YYYY]:")
+		print("Start Date [MM-DD-YYYY]: ")
 		_, err := fmt.Scan(&sDate)
-		if err != nil {
-			log.Fatal("Unable to read  response")
-		}
-
-		stringDate := strings.Split(sDate, "-")
-		startDate.month, _ = strconv.Atoi(stringDate[0])
-		startDate.day, _ = strconv.Atoi(stringDate[1])
-		startDate.year, _ = strconv.Atoi(stringDate[2])
-
-		_, err = fmt.Scan(&sDate)
 		if err != nil {
 			log.Fatal("Unable to read response")
 		}
 
-		print("Start End Date [MM-DD-YYYY]:")
+		stringDate := strings.Split(sDate, "-")
+		for len(stringDate) != 3 {
+			print("Incorrect format, please try again [MM-DD-YYYY]: ")
+			_, err = fmt.Scan(&sDate)
+			stringDate = strings.Split(sDate, "-")
+		}
+
+		startDate.month, _ = strconv.Atoi(stringDate[0])
+		startDate.day, _ = strconv.Atoi(stringDate[1])
+		startDate.year, _ = strconv.Atoi(stringDate[2])
+
+		print("End Date [MM-DD-YYYY]: ")
+		_, err = fmt.Scan(&eDate)
+		if err != nil {
+			log.Fatal("Unable to read response")
+		}
 		stringDate = strings.Split(eDate, "-")
+
+		for len(stringDate) != 3 {
+			print("Incorrect format, please try again [MM-DD-YYYY]: ")
+			_, err = fmt.Scan(&eDate)
+			stringDate = strings.Split(eDate, "-")
+		}
 
 		endDate.month, _ = strconv.Atoi(stringDate[0])
 		endDate.day, _ = strconv.Atoi(stringDate[1])
 		endDate.year, _ = strconv.Atoi(stringDate[2])
 
+		println()
 		print("The following range will be listed: ", sDate, " to ", eDate)
+		println()
 	case 5:
 		*noDate = true
 	}

@@ -33,14 +33,19 @@ var createCmd = &cobra.Command{
 			return
 		}
 
+		var title string
+		for _, str := range args {
+			title += str
+		}
+
 		resp, err := gphotoService.Albums.Create(&photoslibrary.CreateAlbumRequest{
-			Album: &photoslibrary.Album{Title: args[0]}}).Do()
+			Album: &photoslibrary.Album{Title: title}}).Do()
 
 		if err != nil {
 			log.Fatalln(err)
 		}
 
-		println("Successfully created the album: ", resp.Title)
+		println("Successfully created the album:", resp.Title)
 
 	},
 }

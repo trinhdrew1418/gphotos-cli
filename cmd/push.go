@@ -38,7 +38,7 @@ import (
 const (
 	apiVer      = "v1"
 	basePath    = "https://photoslibrary.googleapis.com/"
-	MAX_WORKERS = 8
+	MAX_WORKERS = 4
 )
 
 var (
@@ -70,7 +70,7 @@ var pushCmd = &cobra.Command{
 		newTok, err := config.TokenSource(context.TODO(), tok).Token()
 
 		if err != nil {
-			log.Fatalln(err)
+			log.Fatal(err)
 		}
 
 		if newTok.AccessToken != tok.AccessToken {
@@ -250,7 +250,7 @@ func uploader(uploadTasks chan string, tokenQueue chan UploadInfo, client *http.
 	for filename := range uploadTasks {
 		tok, err := getUploadToken(client, filename)
 		if err != nil {
-			log.Fatalf("unable to make POST request")
+			log.Fatalf("unable to make POST request", err)
 		}
 		if tok != "" {
 			tokenQueue <- UploadInfo{tok, filename}
@@ -278,7 +278,7 @@ func getUploadToken(client *http.Client, filename string) (token string, err err
 	resp, err := expobackoff.RequestUntilSuccess(client.Do, req)
 
 	if err != nil {
-		log.Fatalln(err)
+		log.Fatal(err)
 	}
 
 	if resp.StatusCode != 200 {
@@ -290,7 +290,7 @@ func getUploadToken(client *http.Client, filename string) (token string, err err
 
 	b, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		log.Fatalln(err)
+		log.Fatal(err)
 	}
 
 	uploadToken := string(b)

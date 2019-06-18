@@ -70,22 +70,20 @@ define the directory path you want to download your files to.
 
 Create albums by calling
 
-`gphotos-cli albums create`
+`gphotos-cli albums create [TITLE OF ALBUM]`
 
-More subcommand coming later.
+More subcommands coming later.
 
 # Caveats
 
 * You may unexpectedly hit a quota limit due to the application coming with some default credentials.
 * Due to a google photos api limitation, you can only upload to albums created by the app
 * When downloading files, its undetermined how many photos in total you`ll be downloading. The API uses pagination for large
-requests and instead of waiting for possibly several page requests for the full download request, it is faster to do
-concurrent requests for pages whilst downloading whats available.
+requests and instead of waiting for possibly several page requests for the full download request, it is faster to
+concurrently do requests for pages whilst downloading what's available. The current default page size is 25.
 
 #### TODOs
 
 * More convenient credential replacement using `init`
 * Mass moving existing photos to albums
 * Search by metadata: specific filetypes, camera types, etc.
-* Add options to change the max amount of parallel threads
-* Proper error handling

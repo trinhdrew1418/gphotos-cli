@@ -45,6 +45,10 @@ type Date struct {
 	year  int
 }
 
+func (d *Date) toString() string {
+	return strconv.Itoa(d.month) + "-" + strconv.Itoa(d.day) + "-" + strconv.Itoa(d.year)
+}
+
 type DownloadTask struct {
 	url      string
 	location string
@@ -201,8 +205,7 @@ func downloader(dTaskFeed *chan DownloadTask, wg *sync.WaitGroup) {
 	for task := range *dTaskFeed {
 		resp, err := http.Get(task.url)
 		if err != nil {
-			println("Download failed", resp.StatusCode)
-			os.Exit(1)
+			log.Fatal(err)
 		}
 
 		defer resp.Body.Close()
@@ -306,6 +309,9 @@ func GetDates(noDate *bool) (Date, Date) {
 		endDate = getSomeDaysAgo(0)
 		startDate = getSomeDaysAgo(numDays)
 
+		println()
+		print("The following range will be listed: ", startDate.toString(), " to ", endDate.toString())
+		println()
 	case 4:
 		var sDate string
 		var eDate string

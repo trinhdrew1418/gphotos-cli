@@ -106,8 +106,19 @@ More subcommands coming later.
 requests and instead of waiting for possibly several page requests for the full download request, it is faster to
 concurrently do requests for pages whilst downloading what's available. The current default page size is 25.
 
+# Credits
+Some of these packages were a huge help; either directly, as reference code, or as inspiration.
+
+* [cobra](https://github.com/spf13/cobra)
+* [gphotos-uploader-cli](https://github.com/nmrshll/gphotos-uploader-cli)
+* [mpb](https://github.com/vbauerster/mpb)
+* [promptui](https://github.com/manifoldco/promptui)
+* [drive](https://github.com/odeke-em/drive)
+
+
 ## TODOs
 
 * More convenient credential replacement using `init`
 * Mass moving existing photos to albums
 * Search by metadata: specific filetypes, camera types, etc.
+

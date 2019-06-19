@@ -91,50 +91,12 @@ var pullCmd = &cobra.Command{
 		}
 
 		_, gphotoService := getClientService(photoslibrary.PhotoslibraryScope)
-
-		var (
-			noDate  bool
-			noCat   bool
-			albumID string
-		)
-
 		searchMediaReq := photoslibrary.SearchMediaItemsRequest{}
 
 		if selectAlbum {
-			albumID = GetAlbum(gphotoService)
-			searchMediaReq.AlbumId = albumID
+			searchMediaReq.AlbumId = GetAlbum(gphotoService, false)
 		} else {
-			filt := photoslibrary.Filters{}
-
-			startDate, endDate := GetDates(&noDate)
-			println()
-			categories := GetCategories(&noCat)
-			println()
-
-			if !noCat {
-				filt.ContentFilter = &photoslibrary.ContentFilter{IncludedContentCategories: categories}
-			}
-
-			if !noDate {
-				filt.DateFilter = &photoslibrary.DateFilter{
-					Ranges: []*photoslibrary.DateRange{
-						{
-							StartDate: &photoslibrary.Date{
-								Day:   int64(startDate.day),
-								Month: int64(startDate.month),
-								Year:  int64(startDate.year),
-							},
-							EndDate: &photoslibrary.Date{
-								Day:   int64(endDate.day),
-								Month: int64(endDate.month),
-								Year:  int64(endDate.year),
-							},
-						},
-					},
-				}
-			}
-
-			searchMediaReq.Filters = &filt
+			searchMediaReq.Filters = MakeSearchFilter()
 		}
 
 		resp, err := gphotoService.MediaItems.Search(&searchMediaReq).Do()
@@ -215,6 +177,8 @@ func feedPage(resp *photoslibrary.SearchMediaItemsResponse, dTaskFeed chan Downl
 		}
 
 		extensions, _ := mime.ExtensionsByType(mItem.MimeType)
+		println(mItem.MimeType)
+		println(mItem.MimeType)
 		filename := creationParts[2] + extensions[0]
 		dTaskFeed <- DownloadTask{mItem.BaseUrl + "=d", loc, filename}
 	}
@@ -248,12 +212,46 @@ func downloader(dTaskFeed *chan DownloadTask, wg *sync.WaitGroup) {
 	}
 }
 
-func GetAlbum(serv *photoslibrary.Service) string {
-	if !selectAlbum {
-		return ""
+func MakeSearchFilter() *photoslibrary.Filters {
+	var (
+		noDate bool
+		noCat  bool
+	)
+	filt := photoslibrary.Filters{}
+
+	startDate, endDate := GetDates(&noDate)
+	println()
+	categories := GetCategories(&noCat)
+	println()
+
+	if !noCat {
+		filt.ContentFilter = &photoslibrary.ContentFilter{IncludedContentCategories: categories}
 	}
 
-	albumToID := *retrievers.GetAlbumsToID(serv, false)
+	if !noDate {
+		filt.DateFilter = &photoslibrary.DateFilter{
+			Ranges: []*photoslibrary.DateRange{
+				{
+					StartDate: &photoslibrary.Date{
+						Day:   int64(startDate.day),
+						Month: int64(startDate.month),
+						Year:  int64(startDate.year),
+					},
+					EndDate: &photoslibrary.Date{
+						Day:   int64(endDate.day),
+						Month: int64(endDate.month),
+						Year:  int64(endDate.year),
+					},
+				},
+			},
+		}
+	}
+
+	return &filt
+}
+
+func GetAlbum(serv *photoslibrary.Service, writeable bool) string {
+	albumToID := *retrievers.GetAlbumsToID(serv, writeable)
 	if len(albumToID) >= 1 {
 		titles := make([]string, len(albumToID))
 		i := 0

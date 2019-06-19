@@ -177,6 +177,8 @@ var pushCmd = &cobra.Command{
 
 		p, pbar = progressbar.Make(int64(len(filenames)))
 		pushFiles(gphotoServ, client, filenames)
+		p.Wait()
+		println()
 
 		if len(failedToUpload) > 0 {
 			println("The following files failed to upload: ")

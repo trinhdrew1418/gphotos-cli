@@ -46,7 +46,6 @@ var createCmd = &cobra.Command{
 		}
 
 		println("Successfully created the album:", resp.Title)
-
 	},
 }
 

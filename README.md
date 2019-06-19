@@ -111,6 +111,8 @@ More subcommands coming later.
 * When downloading files, its undetermined how many photos in total you`ll be downloading. The API uses pagination for large
 requests and instead of waiting for possibly several page requests for the full download request, it is faster to
 concurrently do requests for pages whilst downloading what's available. The current default page size is 25.
+* The API does not support the retrieval of raw files. If you try to pull a raw file, it will return a compressed jpeg. Downloading
+raw files still works through the website though.
 
 # Credits
 Some of these packages were a huge help; either directly, as reference code, or as inspiration.
@@ -127,4 +129,3 @@ Some of these packages were a huge help; either directly, as reference code, or 
 * More convenient credential replacement using `init`
 * Mass moving existing photos to albums
 * Search by metadata: specific filetypes, camera types, etc.
-* Using compression for faster transfers

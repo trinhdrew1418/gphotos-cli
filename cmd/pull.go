@@ -177,8 +177,6 @@ func feedPage(resp *photoslibrary.SearchMediaItemsResponse, dTaskFeed chan Downl
 		}
 
 		extensions, _ := mime.ExtensionsByType(mItem.MimeType)
-		println(mItem.MimeType)
-		println(mItem.MimeType)
 		filename := creationParts[2] + extensions[0]
 		dTaskFeed <- DownloadTask{mItem.BaseUrl + "=d", loc, filename}
 	}

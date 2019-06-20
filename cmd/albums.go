@@ -23,7 +23,7 @@ import (
 // albumsCmd represents the albums command
 var albumsCmd = &cobra.Command{
 	Use:   "albums",
-	Short: "A brief description of your command",
+	Short: "Manage albums, create new ones or add existing photos to existing albums",
 	Long: `Manage your albums. Create new ones or add photos to existing
 		ones. Create new ones by calling 
 

@@ -127,7 +127,7 @@ func loadToken() *oauth2.Token {
 }
 
 func getClientService(scope string) (*http.Client, *photoslib.Service) {
-	config := getConfig(photoslib.PhotoslibraryScope)
+	config := getConfig(scope)
 	tok := loadToken()
 
 	client := config.Client(context.Background(), tok)

@@ -15,7 +15,7 @@ and mass uploads.
 
 With Go already installed and setup, just call:
 
-`go get -u http://github.com/trinhdrew1418/gphotos-cli`
+`go get -u github.com/trinhdrew1418/gphotos-cli`
 
 Before usage, you first need to grant the application account authorization:
 

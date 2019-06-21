@@ -26,7 +26,7 @@ var createCmd = &cobra.Command{
 	Use:   "create",
 	Short: "Create albums",
 	Run: func(cmd *cobra.Command, args []string) {
-		_, gphotoService := getClientService(photoslibrary.PhotoslibraryScope)
+		_, gphotoService := getClientService(photoslibrary.PhotoslibrarySharingScope)
 
 		if len(args) < 1 {
 			println("Please specify a title")

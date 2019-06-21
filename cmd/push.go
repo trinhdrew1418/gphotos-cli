@@ -185,6 +185,8 @@ var pushCmd = &cobra.Command{
 			for _, fname := range failedToUpload {
 				println(" - ", fname)
 			}
+		} else {
+			println("No files failed to upload")
 		}
 	},
 }
@@ -233,14 +235,10 @@ func createMedia(srv *photoslib.Service, wg *sync.WaitGroup, tokenQueue chan Upl
 			AlbumId:       workingAlbumID,
 			NewMediaItems: mediaItems}).Do
 
-		resp, err := expobackoff.DoUntilSuccess(makeItems)
+		_, err := expobackoff.DoUntilSuccess(makeItems)
 
 		if err == nil {
-			result := resp.NewMediaItemResults[0]
 			pbar.IncrBy(1)
-			if verbose {
-				fmt.Println(result.Status.Message, "uploaded ", s.filename)
-			}
 		} else {
 			log.Fatalf("Did not create", s.filename)
 		}

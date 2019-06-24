@@ -33,8 +33,8 @@ var createCmd = &cobra.Command{
 			return
 		}
 
-		var title string
-		for _, str := range args {
+		title := args[0]
+		for _, str := range args[1:] {
 			title += " " + str
 		}
 

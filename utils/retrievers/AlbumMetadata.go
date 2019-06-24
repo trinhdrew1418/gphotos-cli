@@ -1,7 +1,8 @@
 package retrievers
 
 import (
-	photoslibrary "google.golang.org/api/photoslibrary/v1"
+	"github.com/manifoldco/promptui"
+	"google.golang.org/api/photoslibrary/v1"
 	"log"
 )
 
@@ -56,6 +57,33 @@ func GetAlbumID(albumName string, s *photoslibrary.Service) string {
 		return val.Id
 	} else {
 		log.Fatalln("Album does not exist")
+		return ""
+	}
+}
+
+func GetAlbum(serv *photoslibrary.Service, writeable bool) string {
+	albumToID := *GetAlbumsToID(serv, writeable)
+	if len(albumToID) >= 1 {
+		titles := make([]string, len(albumToID))
+		i := 0
+		for k := range albumToID {
+			titles[i] = k
+			i++
+		}
+		prompt := promptui.Select{
+			Label: "Select album",
+			Items: titles,
+		}
+
+		_, workingAlbum, err := prompt.Run()
+
+		if err != nil {
+			log.Fatalln(err)
+		}
+
+		return albumToID[workingAlbum]
+	} else {
+		println("No readable albums")
 		return ""
 	}
 }

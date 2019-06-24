@@ -35,7 +35,7 @@ var createCmd = &cobra.Command{
 
 		var title string
 		for _, str := range args {
-			title += str
+			title += " " + str
 		}
 
 		resp, err := gphotoService.Albums.Create(&photoslibrary.CreateAlbumRequest{

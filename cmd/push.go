@@ -75,7 +75,7 @@ var pushCmd = &cobra.Command{
 		}
 
 		if selectAlbum {
-			workingAlbumID = GetAlbum(gphotoServ, true)
+			workingAlbumID = retrievers.GetAlbum(gphotoServ, true)
 			if workingAlbumID == "" {
 				println("No writable albums")
 			}

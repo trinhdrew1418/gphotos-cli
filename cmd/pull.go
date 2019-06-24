@@ -93,8 +93,13 @@ var pullCmd = &cobra.Command{
 		_, gphotoService := getClientService(photoslibrary.PhotoslibraryScope)
 		searchMediaReq := photoslibrary.SearchMediaItemsRequest{}
 
-		if selectAlbum {
-			searchMediaReq.AlbumId = GetAlbum(gphotoService, false)
+		if selectAlbum || DownloadDir != "" {
+			if selectAlbum {
+				searchMediaReq.AlbumId = retrievers.GetAlbum(gphotoService, false)
+			} else {
+				searchMediaReq.AlbumId = retrievers.GetAlbumID(workingAlbum, gphotoService)
+			}
+
 			DownloadDir = path.Join(DownloadDir, workingAlbum)
 			err := os.MkdirAll(DownloadDir, os.ModePerm)
 
@@ -254,34 +259,12 @@ func MakeSearchFilter() *photoslibrary.Filters {
 	return &filt
 }
 
-func GetAlbum(serv *photoslibrary.Service, writeable bool) string {
-	albumToID := *retrievers.GetAlbumsToID(serv, writeable)
-	if len(albumToID) >= 1 {
-		titles := make([]string, len(albumToID))
-		i := 0
-		for k := range albumToID {
-			titles[i] = k
-			i++
-		}
-		prompt := promptui.Select{
-			Label: "Select album",
-			Items: titles,
-		}
-
-		_, workingAlbum, err := prompt.Run()
-
-		if err != nil {
-			log.Fatalln(err)
-		}
-
-		return albumToID[workingAlbum]
-	} else {
-		println("No readable albums")
-		return ""
-	}
-}
-
 func GetCategories(noCat *bool) []string {
+	var (
+		parseString string
+		categories  []string
+	)
+
 	allCategories := []string{
 		"ANIMALS", "LANDMARKS", "PETS", "UTILITY", "BIRTHDAYS", "LANDSCAPES",
 		"RECEIPTS", "WEDDINGS", "CITYSCAPES", "NIGHT", "SCREENSHOTS", "WHITEBOARDS",
@@ -296,27 +279,31 @@ func GetCategories(noCat *bool) []string {
 	}
 	println()
 
-	var parseString string
 	print("Select up to 10 categories [numbers separate by spaces] (ie. 1 4 5 8): ")
 	_, err := fmt.Scan(&parseString)
 	if err != nil {
 		log.Fatal("Unable to obtain categories")
 	}
 
-	categories := strings.Split(parseString, " ")
-	if len(categories) > 10 {
-		log.Fatal("Too many categories")
-	}
-
-	for i, str := range categories {
-		entry, _ := strconv.Atoi(str)
-
-		if entry == 0 {
-			*noCat = true
-			return make([]string, 0)
+	if parseString == "" {
+		println("Defaulting to all categories")
+		*noCat = true
+		return make([]string, 0)
+	} else {
+		categories = strings.Split(parseString, " ")
+		if len(categories) > 10 {
+			log.Fatal("Too many categories")
 		}
 
-		categories[i] = allCategories[entry-1]
+		for i, str := range categories {
+			entry, _ := strconv.Atoi(str)
+
+			if entry == 0 {
+				*noCat = true
+				return make([]string, 0)
+			}
+			categories[i] = allCategories[entry-1]
+		}
 	}
 
 	return categories
@@ -457,8 +444,9 @@ func init() {
 
 	// Here you will define your flags and configuration settings.
 
-	pullCmd.PersistentFlags().StringVar(&DownloadDir, "directory", "./", "Define the directory you want to download your files to")
+	pullCmd.PersistentFlags().StringVarP(&DownloadDir, "directory", "d", "./", "Define the directory you want to download your files to")
 	pullCmd.PersistentFlags().BoolVarP(&selectAlbum, "select", "s", false, "Pull up the album selection menu to download from")
+	pullCmd.PersistentFlags().StringVarP(&workingAlbum, "album", "a", "", "Input the album name you want to download")
 	// Cobra supports Persistent Flags which will work for this command
 	// and all subcommands, e.g.:
 	// pullCmd.PersistentFlags().String("foo", "", "A help for foo")

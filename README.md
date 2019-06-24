@@ -46,6 +46,9 @@ Here are the available options:
 * `-v` or `--verbose`
     This lists out all of the files you'll be uploading. Useful if you want to know which files have
     valid extensions.
+ 
+* `a` or `--album`
+    Input the name of the album you want to upload to
 
 ### `pull`
 
@@ -95,6 +98,9 @@ Here are the available options:
     into a folder of the name of the album. The files will not be organized further beyond
     this. As a limitation of the API, filtering in conjunction with an album request is 
     not possible.
+    
+* `a` or `--album`
+    Input the name of the album you want to download from.
 
 ### `albums`
 

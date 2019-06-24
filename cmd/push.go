@@ -156,9 +156,9 @@ var pushCmd = &cobra.Command{
 
 		if amtBytes < (1 << 10) {
 			println(fmt.Sprintf("Uploading %v files, %.4g B", len(filenames), float64(amtBytes)))
-		} else if amtBytes < (1 << 10 * 2) {
+		} else if amtBytes < (1 << (10 * 2)) {
 			println(fmt.Sprintf("Uploading %v files, %.4g KB", len(filenames), float64(amtBytes)/float64(1<<(10*1))))
-		} else if amtBytes < (1 << 10 * 3) {
+		} else if amtBytes < (1 << (10 * 3)) {
 			println(fmt.Sprintf("Uploading %d files, %.4g MB", len(filenames), float64(amtBytes)/float64(1<<(10*2))))
 		} else {
 			println(fmt.Sprintf("Uploading %d files, %.4g GB", len(filenames), float64(amtBytes)/float64(1<<(10*3))))
@@ -187,6 +187,13 @@ var pushCmd = &cobra.Command{
 			}
 		} else {
 			println("No files failed to upload")
+		}
+
+		if len(alreadyUploaded) > 0 {
+			println("\n The following files were already uploaded: ")
+			for _, fname := range alreadyUploaded {
+				println(" -", fname)
+			}
 		}
 	},
 }
@@ -237,9 +244,7 @@ func createMedia(srv *photoslib.Service, wg *sync.WaitGroup, tokenQueue chan Upl
 
 		_, err := expobackoff.DoUntilSuccess(makeItems)
 
-		if err == nil {
-			pbar.IncrBy(1)
-		} else {
+		if err != nil {
 			log.Fatalf("Did not create", s.filename)
 		}
 	}
@@ -247,19 +252,18 @@ func createMedia(srv *photoslib.Service, wg *sync.WaitGroup, tokenQueue chan Upl
 
 func uploader(uploadTasks chan string, tokenQueue chan UploadInfo, client *http.Client, w *sync.WaitGroup) {
 	for filename := range uploadTasks {
-		tok, err := getUploadToken(client, filename)
-		if err != nil {
-			log.Fatalf("unable to make POST request", err)
-		}
+		tok := getUploadToken(client, filename)
 		if tok != "" {
 			tokenQueue <- UploadInfo{tok, filename}
 		}
+
+		pbar.IncrBy(1)
 	}
 	w.Done()
 }
 
 // get upload token
-func getUploadToken(client *http.Client, filename string) (token string, err error) {
+func getUploadToken(client *http.Client, filename string) string {
 	file, err := os.Open(filename)
 	if err != nil {
 		log.Fatalf("Cannot open a file %v", err)
@@ -275,14 +279,13 @@ func getUploadToken(client *http.Client, filename string) (token string, err err
 	req.Header.Set("X-Goog-Upload-Protocol", "raw")
 
 	resp, err := expobackoff.RequestUntilSuccess(client.Do, req)
-
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	if resp.StatusCode != 200 {
+	if resp.StatusCode/100 != 2 {
 		failedToUpload = append(failedToUpload, filename)
-		return "", nil
+		return ""
 	}
 
 	defer resp.Body.Close()
@@ -294,7 +297,7 @@ func getUploadToken(client *http.Client, filename string) (token string, err err
 
 	uploadToken := string(b)
 
-	return uploadToken, err
+	return uploadToken
 }
 
 func init() {

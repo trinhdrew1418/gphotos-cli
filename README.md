@@ -5,11 +5,12 @@ and mass uploads.
 
 ## Features
 
-* Parallelized transfers
+* Parallelized uploading and downloading
 * Filtering by date and category type for downloads
 * Album creation
-* Uploads to designated albums (can only upload to albums created by this app due to Google's API limitations)
-* Exponential backoff for large uploads and downloads
+* Uploads and downloads to/from albums (can only upload to albums created by this app due to Google's API limitations)
+* Exponential backoff for large uploads and downloads, I've personally tested jobs 100 GB+ large
+* Handles all raw video and image types supported by Google photos
 
 # Installation
 

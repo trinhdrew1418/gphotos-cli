@@ -15,6 +15,7 @@
 package cmd
 
 import (
+	"bufio"
 	"fmt"
 	"github.com/manifoldco/promptui"
 	"github.com/trinhdrew1418/gphotos-cli/utils"
@@ -93,7 +94,7 @@ var pullCmd = &cobra.Command{
 		_, gphotoService := getClientService(photoslibrary.PhotoslibraryScope)
 		searchMediaReq := photoslibrary.SearchMediaItemsRequest{}
 
-		if selectAlbum || DownloadDir != "" {
+		if selectAlbum || workingAlbum != "" {
 			if selectAlbum {
 				searchMediaReq.AlbumId = retrievers.GetAlbum(gphotoService, false)
 			} else {
@@ -124,7 +125,7 @@ var pullCmd = &cobra.Command{
 		}
 
 		currTotal := int64(len(resp.MediaItems))
-		p, pbar = progressbar.Make(currTotal)
+		p, pbar = progressbar.Make(currTotal, "Download Files: ")
 		feedPage(resp, dTaskFeed)
 
 		for resp.NextPageToken != "" {
@@ -279,12 +280,10 @@ func GetCategories(noCat *bool) []string {
 	}
 	println()
 
+	scanner := bufio.NewScanner(os.Stdin)
 	print("Select up to 10 categories [numbers separate by spaces] (ie. 1 4 5 8): ")
-	_, err := fmt.Scan(&parseString)
-	if err != nil {
-		log.Fatal("Unable to obtain categories")
-	}
-
+	scanner.Scan()
+	parseString = scanner.Text()
 	if parseString == "" {
 		println("Defaulting to all categories")
 		*noCat = true

@@ -135,7 +135,7 @@ var pushCmd = &cobra.Command{
 			return
 		}
 
-		p, pbar = progressbar.Make(int64(len(filenames)))
+		p, pbar = progressbar.Make(int64(len(filenames)), "Uploading Files: ")
 		pushFiles(gphotoServ, client, filenames)
 		p.Wait()
 		println()

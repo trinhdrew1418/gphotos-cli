@@ -70,7 +70,7 @@ func getConfig(scope string) *oauth2.Config {
 		log.Fatalf("unable to read client credentials %v", err)
 	}
 
-	config, err := google.ConfigFromJSON(b, photoslib.PhotoslibraryScope)
+	config, err := google.ConfigFromJSON(b, scope)
 	if err != nil {
 		log.Fatalf("Unable to produce config %v", err)
 	}
@@ -129,6 +129,16 @@ func loadToken() *oauth2.Token {
 func getClientService(scope string) (*http.Client, *photoslib.Service) {
 	config := getConfig(scope)
 	tok := loadToken()
+	newTok, err := config.TokenSource(context.TODO(), tok).Token()
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	if newTok.AccessToken != tok.AccessToken {
+		saveToken(newTok)
+		tok = newTok
+	}
 
 	client := config.Client(context.Background(), tok)
 	gphotoServ, err := photoslib.New(client)

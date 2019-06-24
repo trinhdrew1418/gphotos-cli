@@ -95,6 +95,12 @@ var pullCmd = &cobra.Command{
 
 		if selectAlbum {
 			searchMediaReq.AlbumId = GetAlbum(gphotoService, false)
+			DownloadDir = path.Join(DownloadDir, workingAlbum)
+			err := os.MkdirAll(DownloadDir, os.ModePerm)
+
+			if err != nil {
+				log.Fatal(err)
+			}
 		} else {
 			searchMediaReq.Filters = MakeSearchFilter()
 		}
@@ -266,12 +272,6 @@ func GetAlbum(serv *photoslibrary.Service, writeable bool) string {
 
 		if err != nil {
 			log.Fatalln(err)
-		}
-
-		DownloadDir = path.Join(DownloadDir, workingAlbum)
-		err = os.MkdirAll(DownloadDir, os.ModePerm)
-		if err != nil {
-			log.Fatal(err)
 		}
 
 		return albumToID[workingAlbum]

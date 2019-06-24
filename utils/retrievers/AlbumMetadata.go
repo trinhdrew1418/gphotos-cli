@@ -50,6 +50,8 @@ func GetAlbumID(albumName string, s *photoslibrary.Service) string {
 	if val, ok := albumMap[albumName]; ok {
 		if !val.IsWriteable {
 			log.Fatalln("Album exists but is not writable")
+		} else {
+			println("Album found!")
 		}
 		return val.Id
 	} else {

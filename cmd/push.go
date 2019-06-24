@@ -21,12 +21,10 @@ import (
 	"github.com/vbauerster/mpb"
 	"strings"
 
-	"github.com/manifoldco/promptui"
 	"github.com/spf13/cobra"
 	"github.com/trinhdrew1418/gphotos-cli/utils/expobackoff"
 	"github.com/trinhdrew1418/gphotos-cli/utils/filetypes"
 	"github.com/trinhdrew1418/gphotos-cli/utils/retrievers"
-	"golang.org/x/net/context"
 	photoslib "google.golang.org/api/photoslibrary/v1"
 	"io/ioutil"
 	"log"
@@ -66,29 +64,10 @@ var pushCmd = &cobra.Command{
 			return
 		}
 
-		config := getConfig(photoslib.PhotoslibraryScope)
-		tok := loadToken()
-		newTok, err := config.TokenSource(context.TODO(), tok).Token()
+		client, gphotoServ := getClientService(photoslib.PhotoslibraryScope)
 
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		if newTok.AccessToken != tok.AccessToken {
-			fmt.Println("Token refreshed")
-			saveToken(newTok)
-			tok = newTok
-		}
-
-		client := config.Client(context.Background(), newTok)
-		gphotoServ, err := photoslib.New(client)
-		if err != nil {
-			log.Fatalf("Unable to retrieve google photos service: %v", err)
-		}
-
-		if selectAlbum && workingAlbum != "" {
-			println("Can only either use the album select or declare an album destination, not both")
-			return
+		if workingAlbum != "" && selectAlbum {
+			log.Fatal("Only select an album or input an album name, not both")
 		}
 
 		if workingAlbum != "" {
@@ -96,27 +75,8 @@ var pushCmd = &cobra.Command{
 		}
 
 		if selectAlbum {
-			albumToID := *retrievers.GetAlbumsToID(gphotoServ, true)
-
-			if len(albumToID) >= 1 {
-				titles := make([]string, len(albumToID))
-				i := 0
-				for k := range albumToID {
-					titles[i] = k
-					i++
-				}
-				prompt := promptui.Select{
-					Label: "Select album",
-					Items: titles,
-				}
-
-				_, workingAlbum, err = prompt.Run()
-
-				if err != nil {
-					log.Fatalln(err)
-				}
-				workingAlbumID = albumToID[workingAlbum]
-			} else {
+			workingAlbumID = GetAlbum(gphotoServ, true)
+			if workingAlbumID == "" {
 				println("No writable albums")
 			}
 		}
@@ -165,7 +125,7 @@ var pushCmd = &cobra.Command{
 		}
 
 		print("Do you wish to proceed ([y]/n)?: ")
-		_, err = fmt.Scan(&answer)
+		_, err := fmt.Scan(&answer)
 		if err != nil {
 			log.Fatalf("Unable to read answer")
 		}
@@ -188,18 +148,10 @@ var pushCmd = &cobra.Command{
 		} else {
 			println("No files failed to upload")
 		}
-
-		if len(alreadyUploaded) > 0 {
-			println("\n The following files were already uploaded: ")
-			for _, fname := range alreadyUploaded {
-				println(" -", fname)
-			}
-		}
 	},
 }
 
 func pushFiles(srv *photoslib.Service, client *http.Client, filenames []string) {
-	tokens := make([]UploadInfo, 0)
 	tokenQueue := make(chan UploadInfo)
 
 	var wg sync.WaitGroup
@@ -207,7 +159,7 @@ func pushFiles(srv *photoslib.Service, client *http.Client, filenames []string) 
 	wg.Add(1)
 	go requestUploadTokens(client, &filenames, &wg, tokenQueue)
 	wg.Add(1)
-	go createMedia(srv, &wg, tokenQueue, &tokens)
+	go createMedia(srv, &wg, tokenQueue)
 	wg.Wait()
 }
 
@@ -231,7 +183,7 @@ func requestUploadTokens(client *http.Client, filenames *[]string, wg *sync.Wait
 	w.Wait()
 }
 
-func createMedia(srv *photoslib.Service, wg *sync.WaitGroup, tokenQueue chan UploadInfo, tokens *[]UploadInfo) {
+func createMedia(srv *photoslib.Service, wg *sync.WaitGroup, tokenQueue chan UploadInfo) {
 	defer wg.Done()
 
 	for s := range tokenQueue {
@@ -311,6 +263,7 @@ func init() {
 	pushCmd.PersistentFlags().BoolVarP(&recursive, "recursive", "r", false, "Recursively select files to be uploaded from directories")
 	pushCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Print out uploaded files")
 	pushCmd.PersistentFlags().BoolVarP(&selectAlbum, "select", "s", false, "Select the album you want to do work in")
+	pushCmd.PersistentFlags().StringVarP(&workingAlbum, "album", "a", "", "Input the album name that you want to upload to")
 
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:

@@ -61,7 +61,7 @@ func GetAlbumID(albumName string, s *photoslibrary.Service) string {
 	}
 }
 
-func GetAlbum(serv *photoslibrary.Service, writeable bool) string {
+func GetAlbum(serv *photoslibrary.Service, writeable bool) (string, string) {
 	albumToID := *GetAlbumsToID(serv, writeable)
 	if len(albumToID) >= 1 {
 		titles := make([]string, len(albumToID))
@@ -81,9 +81,9 @@ func GetAlbum(serv *photoslibrary.Service, writeable bool) string {
 			log.Fatalln(err)
 		}
 
-		return albumToID[workingAlbum]
+		return workingAlbum, albumToID[workingAlbum]
 	} else {
 		println("No readable albums")
-		return ""
+		return "", ""
 	}
 }

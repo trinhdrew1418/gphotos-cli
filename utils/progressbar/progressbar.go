@@ -12,6 +12,8 @@ func Make(total int64, title string) (*mpb.Progress, *mpb.Bar) {
 			decor.Name(title),
 			decor.CountersNoUnit("%d / %d", decor.WCSyncWidth),
 		),
+		mpb.AppendDecorators(
+			decor.Percentage()),
 	)
 
 	return p, bar

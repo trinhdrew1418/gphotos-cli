@@ -96,7 +96,7 @@ var pullCmd = &cobra.Command{
 
 		if selectAlbum || workingAlbum != "" {
 			if selectAlbum {
-				searchMediaReq.AlbumId = retrievers.GetAlbum(gphotoService, false)
+				workingAlbum, searchMediaReq.AlbumId = retrievers.GetAlbum(gphotoService, false)
 			} else {
 				searchMediaReq.AlbumId = retrievers.GetAlbumID(workingAlbum, gphotoService)
 			}
@@ -116,6 +116,10 @@ var pullCmd = &cobra.Command{
 			log.Fatal("Failed media search", err)
 		}
 
+		if len(resp.MediaItems) < 1 {
+			log.Fatal("No media items found")
+		}
+
 		dTaskFeed := make(chan DownloadTask)
 		var wg sync.WaitGroup
 
@@ -125,7 +129,7 @@ var pullCmd = &cobra.Command{
 		}
 
 		currTotal := int64(len(resp.MediaItems))
-		p, pbar = progressbar.Make(currTotal, "Download Files: ")
+		p, pbar = progressbar.Make(currTotal, "Downloading Files: ")
 		feedPage(resp, dTaskFeed)
 
 		for resp.NextPageToken != "" {
@@ -218,7 +222,7 @@ func downloader(dTaskFeed *chan DownloadTask, wg *sync.WaitGroup) {
 		resp.Body.Close()
 		f.Close()
 
-		pbar.Increment()
+		pbar.IncrBy(1)
 	}
 }
 

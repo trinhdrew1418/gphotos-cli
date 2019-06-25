@@ -16,20 +16,19 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/trinhdrew1418/gphotos-cli/utils"
-	"github.com/trinhdrew1418/gphotos-cli/utils/progressbar"
-	"github.com/vbauerster/mpb"
-	"strings"
-
 	"github.com/spf13/cobra"
+	"github.com/trinhdrew1418/gphotos-cli/utils"
 	"github.com/trinhdrew1418/gphotos-cli/utils/expobackoff"
 	"github.com/trinhdrew1418/gphotos-cli/utils/filetypes"
+	"github.com/trinhdrew1418/gphotos-cli/utils/progressbar"
 	"github.com/trinhdrew1418/gphotos-cli/utils/retrievers"
+	"github.com/vbauerster/mpb"
 	photoslib "google.golang.org/api/photoslibrary/v1"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"sync"
 )
 
@@ -75,7 +74,7 @@ var pushCmd = &cobra.Command{
 		}
 
 		if selectAlbum {
-			workingAlbumID = retrievers.GetAlbum(gphotoServ, true)
+			workingAlbum, workingAlbumID = retrievers.GetAlbum(gphotoServ, true)
 			if workingAlbumID == "" {
 				println("No writable albums")
 			}
@@ -208,7 +207,6 @@ func uploader(uploadTasks chan string, tokenQueue chan UploadInfo, client *http.
 		if tok != "" {
 			tokenQueue <- UploadInfo{tok, filename}
 		}
-
 		pbar.IncrBy(1)
 	}
 	w.Done()

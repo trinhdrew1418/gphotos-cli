@@ -93,6 +93,7 @@ var pullCmd = &cobra.Command{
 
 		_, gphotoService := getClientService(photoslibrary.PhotoslibraryScope)
 		searchMediaReq := photoslibrary.SearchMediaItemsRequest{}
+		searchMediaReq.PageSize = 50
 
 		if selectAlbum || workingAlbum != "" {
 			if selectAlbum {
@@ -130,7 +131,9 @@ var pullCmd = &cobra.Command{
 
 		currTotal := int64(len(resp.MediaItems))
 		p, pbar = progressbar.Make(currTotal, "Downloading Files: ")
-		feedPage(resp, dTaskFeed)
+
+		wg.Add(1)
+		go feedPage(resp, dTaskFeed, &wg)
 
 		for resp.NextPageToken != "" {
 			searchMediaReq.PageToken = resp.NextPageToken
@@ -153,8 +156,11 @@ var pullCmd = &cobra.Command{
 
 			currTotal += int64(len(resp.MediaItems))
 			pbar.SetTotal(currTotal, false)
-			feedPage(resp, dTaskFeed)
+			wg.Add(1)
+			go feedPage(resp, dTaskFeed, &wg)
 		}
+
+		wg.Wait()
 
 		close(dTaskFeed)
 		wg.Wait()
@@ -177,7 +183,9 @@ var pullCmd = &cobra.Command{
 	FParseErrWhitelist:         cobra.FParseErrWhitelist{},
 }
 
-func feedPage(resp *photoslibrary.SearchMediaItemsResponse, dTaskFeed chan DownloadTask) {
+func feedPage(resp *photoslibrary.SearchMediaItemsResponse, dTaskFeed chan DownloadTask, wg *sync.WaitGroup) {
+	defer wg.Done()
+
 	for _, mItem := range resp.MediaItems {
 		creationParts := strings.Split(mItem.MediaMetadata.CreationTime, "-")
 		loc := DownloadDir

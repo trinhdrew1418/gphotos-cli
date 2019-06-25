@@ -132,8 +132,10 @@ var pullCmd = &cobra.Command{
 		currTotal := int64(len(resp.MediaItems))
 		p, pbar = progressbar.Make(currTotal, "Downloading Files: ")
 
-		wg.Add(1)
-		go feedPage(resp, dTaskFeed, &wg)
+		var feedWg sync.WaitGroup
+
+		feedWg.Add(1)
+		go feedPage(resp, dTaskFeed, &feedWg)
 
 		for resp.NextPageToken != "" {
 			searchMediaReq.PageToken = resp.NextPageToken
@@ -156,12 +158,11 @@ var pullCmd = &cobra.Command{
 
 			currTotal += int64(len(resp.MediaItems))
 			pbar.SetTotal(currTotal, false)
-			wg.Add(1)
-			go feedPage(resp, dTaskFeed, &wg)
+			feedWg.Add(1)
+			go feedPage(resp, dTaskFeed, &feedWg)
 		}
 
-		wg.Wait()
-
+		feedWg.Wait()
 		close(dTaskFeed)
 		wg.Wait()
 		p.Wait()

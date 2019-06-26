@@ -130,7 +130,6 @@ var pullCmd = &cobra.Command{
 		}
 
 		currTotal := int64(len(resp.MediaItems))
-		println()
 		p, pbar = progressbar.Make(currTotal, "Downloading Files: ")
 
 		var feedWg sync.WaitGroup
@@ -205,7 +204,15 @@ func feedPage(resp *photoslibrary.SearchMediaItemsResponse, dTaskFeed chan Downl
 
 		extensions, _ := mime.ExtensionsByType(mItem.MimeType)
 		filename := creationParts[2] + extensions[0]
-		dTaskFeed <- DownloadTask{mItem.BaseUrl + "=d", loc, filename}
+
+		var downloadUrl string
+		if mItem.MediaMetadata.Photo != nil {
+			downloadUrl = mItem.BaseUrl + "=d"
+		} else {
+			downloadUrl = mItem.BaseUrl + "=dv"
+		}
+
+		dTaskFeed <- DownloadTask{downloadUrl, loc, filename}
 	}
 }
 

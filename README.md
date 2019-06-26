@@ -136,3 +136,4 @@ Some of these packages were a huge help; either directly, as reference code, or 
 * More convenient credential replacement using `init`
 * Mass moving existing photos to albums
 * Search by metadata: specific filetypes, camera types, etc.
+* Resumable uploads and data chunking for large file uploads

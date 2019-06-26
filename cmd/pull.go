@@ -130,6 +130,7 @@ var pullCmd = &cobra.Command{
 		}
 
 		currTotal := int64(len(resp.MediaItems))
+		println()
 		p, pbar = progressbar.Make(currTotal, "Downloading Files: ")
 
 		var feedWg sync.WaitGroup
@@ -166,7 +167,8 @@ var pullCmd = &cobra.Command{
 		close(dTaskFeed)
 		wg.Wait()
 		p.Wait()
-		println("Complete")
+		println()
+		println("Completed.\n")
 	},
 	RunE:                       nil,
 	PostRun:                    nil,

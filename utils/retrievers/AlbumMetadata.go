@@ -24,13 +24,14 @@ func GetAlbumsToID(s *photoslibrary.Service, write bool) *map[string]string {
 
 func makeAlbumMap(s *photoslibrary.Service) *map[string]*photoslibrary.Album {
 	var albums []*photoslibrary.Album
-	albumsResp, err := s.Albums.List().Do()
+	albumsResp, err := s.Albums.List().PageSize(50).Do()
 	if err != nil {
 		log.Fatalln(err)
 	}
+
 	albums = albumsResp.Albums
 	for albumsResp.NextPageToken != "" {
-		albumsResp, err = s.Albums.List().PageToken(albumsResp.NextPageToken).Do()
+		albumsResp, err = s.Albums.List().PageSize(50).PageToken(albumsResp.NextPageToken).Do()
 		if err != nil {
 			log.Fatalln(err)
 		}

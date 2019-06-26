@@ -145,7 +145,7 @@ var pushCmd = &cobra.Command{
 				println(" - ", fname)
 			}
 		} else {
-			println("No files failed to upload")
+			println("Completed.\n")
 		}
 	},
 }

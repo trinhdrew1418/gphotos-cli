@@ -49,11 +49,11 @@ var initCmd = &cobra.Command{
 
 		// save the token into a file
 		saveToken(tok)
+		println("Saved Token.")
 	},
 }
 
 func saveToken(token *oauth2.Token) {
-	fmt.Println("Saving token file")
 	f, err := os.OpenFile(os.Getenv("GOPATH")+tokenFile, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600)
 	if err != nil {
 		log.Fatalf("Unable to cache oauth token: %v", err)

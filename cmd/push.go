@@ -15,6 +15,7 @@
 package cmd
 
 import (
+	"bytes"
 	"fmt"
 	"github.com/spf13/cobra"
 	"github.com/trinhdrew1418/gphotos-cli/utils"
@@ -26,8 +27,11 @@ import (
 	photoslib "google.golang.org/api/photoslibrary/v1"
 	"io/ioutil"
 	"log"
+	"math"
+	"mime"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 )
@@ -202,8 +206,21 @@ func createMedia(srv *photoslib.Service, wg *sync.WaitGroup, tokenQueue chan Upl
 }
 
 func uploader(uploadTasks chan string, tokenQueue chan UploadInfo, client *http.Client, w *sync.WaitGroup) {
+	BYTE_LIMT := int64(50 * (1 << 20))
+	var tok string
+
 	for filename := range uploadTasks {
-		tok := getUploadToken(client, filename)
+		info, err := os.Stat(filename)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		if info.Size() > BYTE_LIMT {
+			tok = chunkedUploadToken(client, filename)
+		} else {
+			tok = simpleUploadToken(client, filename)
+		}
+
 		if tok != "" {
 			tokenQueue <- UploadInfo{tok, filename}
 		}
@@ -212,9 +229,71 @@ func uploader(uploadTasks chan string, tokenQueue chan UploadInfo, client *http.
 	w.Done()
 }
 
-// get upload token
-func getUploadToken(client *http.Client, filename string) string {
+func chunkedUploadToken(client *http.Client, filename string) string {
 	file, err := os.Open(filename)
+
+	if err != nil {
+		log.Fatalf("Cannot open a file %v", err)
+	}
+
+	info, _ := os.Stat(filename)
+	fileSize := info.Size()
+
+	req, err := http.NewRequest("POST", fmt.Sprintf("%s/%s/uploads", basePath, apiVer), file)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	req.Header.Add("Content-Length", "0")
+	req.Header.Add("X-Goog-Upload-Command", "start")
+	req.Header.Add("X-Goog-Upload-Content-Type", mime.TypeByExtension(filename))
+	req.Header.Add("X-Goog-Upload-File-Name", filename)
+	req.Header.Add("X-Goog-Upload-Protocol", "resumable")
+	req.Header.Add("X-Goog-Upload-Raw-Size", strconv.Itoa(int(fileSize)))
+
+	resp, err := client.Do(req)
+	uploadUrl := resp.Header.Get("X-Goog-Upload-URL")
+	chunkSizeStr := resp.Header.Get("X-Goog-Upload-Chunk-Granularity")
+	chunkSize, _ := strconv.Atoi(chunkSizeStr)
+
+	numChunks := int(math.Ceil(float64(fileSize) / float64(chunkSize)))
+
+	for i := 0; i < numChunks-1; i++ {
+		numBytes := int64(chunkSize)
+		partBuffer := make([]byte, numBytes)
+
+		file.Read(partBuffer)
+		body := bytes.NewReader(partBuffer)
+
+		req, err = http.NewRequest("POST", uploadUrl, body)
+		req.Header.Add("Content-Length", chunkSizeStr)
+		req.Header.Add("X-Goog-Upload-Command", "upload")
+		req.Header.Add("X-Goog-Upload-Offset", strconv.Itoa(i*chunkSize))
+		client.Do(req)
+	}
+
+	numBytes := int64(int(fileSize) - (numChunks-1)*chunkSize)
+	partBuffer := make([]byte, numBytes)
+	file.Read(partBuffer)
+	body := bytes.NewReader(partBuffer)
+
+	req, err = http.NewRequest("POST", uploadUrl, body)
+	req.Header.Add("Content-Length", chunkSizeStr)
+	req.Header.Add("X-Goog-Upload-Command", "upload")
+	req.Header.Add("X-Goog-Upload-Offset", strconv.Itoa(int(numBytes)))
+	resp, err = client.Do(req)
+
+	defer resp.Body.Close()
+
+	b, err := ioutil.ReadAll(resp.Body)
+
+	return string(b)
+}
+
+// get upload token
+func simpleUploadToken(client *http.Client, filename string) string {
+	file, err := os.Open(filename)
+
 	if err != nil {
 		log.Fatalf("Cannot open a file %v", err)
 	}

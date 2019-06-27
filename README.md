@@ -23,19 +23,24 @@ Before usage, you first need to grant the application account authorization:
 `gphotos-cli init`
 
 # Commands
-### `init`
+### init
 
 This initializes the authorization token needed to access your account
 
 `gphotos-cli init`
 
-### `push`
+#### options
+
+* `-c` or `--credential-path`
+Designate the path of the credenntial file you'd alternatively like to use.
+
+### push
 
 Command to upload files to your google photos library.
 
 `gphotos-cli push [-OPTIONS] [FILE 1] [FOLDER 1] ...`
 
-Here are the available options:
+#### options
 
 * `-r` or `--recursive`
     Recursively traverses folders in arguments for file uploads
@@ -51,7 +56,7 @@ Here are the available options:
 * `-a` or `--album`
     Input the name of the album you want to upload to
 
-### `pull`
+### pull
 
 Command to download files
 
@@ -89,7 +94,7 @@ You can filter up to 10 of the following categories:
 * performances
 * sport
 
-Here are the available options:
+#### options
 
 * `-d [PATH]`
     define the directory path you want to download your files to.
@@ -133,6 +138,5 @@ Some of these packages were a huge help; either directly, as reference code, or 
 
 ## TODOs
 
-* More convenient credential replacement using `init`
 * Mass moving existing photos to albums
 * Search by metadata: specific filetypes, camera types, etc.

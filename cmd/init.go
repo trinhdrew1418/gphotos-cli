@@ -33,6 +33,10 @@ const (
 	tokenFile      = "/src/github.com/trinhdrew1418/gphotos-cli/auth/token.json"
 )
 
+var (
+	altCredentials string
+)
+
 // initCmd represents the init command
 var initCmd = &cobra.Command{
 	Use:   "init",
@@ -42,13 +46,11 @@ var initCmd = &cobra.Command{
 	// this function obtains the token and saves it
 	Run: func(cmd *cobra.Command, args []string) {
 		// get the config
+
 		config := getConfig(photoslib.PhotoslibraryScope)
-
-		// use the config to the get the token
 		tok := getTokenFromWeb(config)
-
-		// save the token into a file
 		saveToken(tok)
+
 		println("Saved Token.")
 	},
 }
@@ -65,7 +67,14 @@ func saveToken(token *oauth2.Token) {
 
 // make config
 func getConfig(scope string) *oauth2.Config {
-	b, err := ioutil.ReadFile(os.Getenv("GOPATH") + credentialFile)
+	var credPath string
+	if altCredentials != "" {
+		credPath = altCredentials
+	} else {
+		credPath = os.Getenv("GOPATH") + credentialFile
+	}
+
+	b, err := ioutil.ReadFile(credPath)
 	if err != nil {
 		log.Fatalf("unable to read client credentials %v", err)
 	}
@@ -154,11 +163,11 @@ func init() {
 	rootCmd.AddCommand(initCmd)
 
 	// Here you will define your flags and configuration settings.
-
 	// Cobra supports Persistent Flags which will work for this command
 	// and all subcommands, e.g.:
 	// initCmd.PersistentFlags().String("foo", "", "A help for foo")
-
+	rootCmd.PersistentFlags().StringVarP(&altCredentials, "credential path", "c", "",
+		"designate the path of the credential file you'd alternatively like to use")
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:
 	// initCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")

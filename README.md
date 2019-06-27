@@ -3,13 +3,13 @@
 A command line interface app for Google photos for doing bulk tasks such as mass filtered downloads
 and mass uploads.
 
-## Features
+# Features
 
 * Parallelized uploading and downloading
 * Filtering by date and category type for downloads
 * Album creation
 * Uploads and downloads to/from albums (can only upload to albums created by this app due to Google's API limitations)
-* Exponential backoff for large uploads and downloads, I've personally tested jobs 100 GB+ large
+* Exponential backoff for large uploads and downloads, tested on jobs 100 GB+ large
 * Handles all raw video and image types supported by Google photos
 
 # Installation
@@ -23,24 +23,24 @@ Before usage, you first need to grant the application account authorization:
 `gphotos-cli init`
 
 # Commands
-### init
+## init
 
 This initializes the authorization token needed to access your account
 
 `gphotos-cli init`
 
-#### options
+##### options
 
 * `-c` or `--credential-path`
 Designate the path of the credenntial file you'd alternatively like to use.
 
-### push
+## push
 
 Command to upload files to your google photos library.
 
 `gphotos-cli push [-OPTIONS] [FILE 1] [FOLDER 1] ...`
 
-#### options
+##### options
 
 * `-r` or `--recursive`
     Recursively traverses folders in arguments for file uploads
@@ -56,7 +56,7 @@ Command to upload files to your google photos library.
 * `-a` or `--album`
     Input the name of the album you want to upload to
 
-### pull
+## pull
 
 Command to download files
 
@@ -94,7 +94,7 @@ You can filter up to 10 of the following categories:
 * performances
 * sport
 
-#### options
+##### options
 
 * `-d [PATH]`
     define the directory path you want to download your files to.
@@ -108,7 +108,7 @@ You can filter up to 10 of the following categories:
 * `-a` or `--album`
     Input the name of the album you want to download from.
 
-### `albums`
+## albums
 
 Create albums by calling
 
@@ -141,3 +141,4 @@ Some of these packages were a huge help; either directly, as reference code, or 
 * Mass moving existing photos to albums
 * Search by metadata: specific filetypes, camera types, etc.
 * Resumable uploads and data chunking for large file uploads
+* Upload and download speed metrics

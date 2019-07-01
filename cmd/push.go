@@ -138,7 +138,7 @@ var pushCmd = &cobra.Command{
 			return
 		}
 
-		p, pbar = progressbar.Make(int64(len(filenames)), "Uploading Files: ")
+		p, pbar = progressbar.MakeByte(amtBytes, "Uploading Files: ")
 		pushFiles(gphotoServ, client, filenames)
 		p.Wait()
 		println()
@@ -164,6 +164,7 @@ func pushFiles(srv *photoslib.Service, client *http.Client, filenames []string) 
 	wg.Add(1)
 	go createMedia(srv, &wg, tokenQueue)
 	wg.Wait()
+	pbar.Completed()
 }
 
 func requestUploadTokens(client *http.Client, filenames *[]string, wg *sync.WaitGroup, tokenQueue chan UploadInfo) {
@@ -206,7 +207,7 @@ func createMedia(srv *photoslib.Service, wg *sync.WaitGroup, tokenQueue chan Upl
 }
 
 func uploader(uploadTasks chan string, tokenQueue chan UploadInfo, client *http.Client, w *sync.WaitGroup) {
-	BYTE_LIMT := int64(50 * (1 << 20))
+	BYTE_LIMT := int64(1 << 50)
 	var tok string
 
 	for filename := range uploadTasks {
@@ -244,14 +245,19 @@ func chunkedUploadToken(client *http.Client, filename string) string {
 		log.Fatal(err)
 	}
 
-	req.Header.Add("Content-Length", "0")
-	req.Header.Add("X-Goog-Upload-Command", "start")
-	req.Header.Add("X-Goog-Upload-Content-Type", mime.TypeByExtension(filename))
-	req.Header.Add("X-Goog-Upload-File-Name", filename)
-	req.Header.Add("X-Goog-Upload-Protocol", "resumable")
-	req.Header.Add("X-Goog-Upload-Raw-Size", strconv.Itoa(int(fileSize)))
+	req.Header.Set("Content-Length", "0")
+	req.Header.Set("X-Goog-Upload-Command", "start")
+	req.Header.Set("X-Goog-Upload-Content-Type", mime.TypeByExtension(filename))
+	req.Header.Set("X-Goog-Upload-File-Name", filename)
+	req.Header.Set("X-Goog-Upload-Protocol", "resumable")
+	req.Header.Set("X-Goog-Upload-Raw-Size", strconv.Itoa(int(fileSize)))
 
 	resp, err := client.Do(req)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	print(resp.Status)
 	uploadUrl := resp.Header.Get("X-Goog-Upload-URL")
 	chunkSizeStr := resp.Header.Get("X-Goog-Upload-Chunk-Granularity")
 	chunkSize, _ := strconv.Atoi(chunkSizeStr)
@@ -264,11 +270,12 @@ func chunkedUploadToken(client *http.Client, filename string) string {
 
 		file.Read(partBuffer)
 		body := bytes.NewReader(partBuffer)
+		s := pbar.ProxyReader(body)
 
-		req, err = http.NewRequest("POST", uploadUrl, body)
-		req.Header.Add("Content-Length", chunkSizeStr)
-		req.Header.Add("X-Goog-Upload-Command", "upload")
-		req.Header.Add("X-Goog-Upload-Offset", strconv.Itoa(i*chunkSize))
+		req, err = http.NewRequest("POST", uploadUrl, s)
+		req.Header.Set("Content-Length", chunkSizeStr)
+		req.Header.Set("X-Goog-Upload-Command", "upload")
+		req.Header.Set("X-Goog-Upload-Offset", strconv.Itoa(i*chunkSize))
 		client.Do(req)
 	}
 
@@ -276,11 +283,12 @@ func chunkedUploadToken(client *http.Client, filename string) string {
 	partBuffer := make([]byte, numBytes)
 	file.Read(partBuffer)
 	body := bytes.NewReader(partBuffer)
+	s := pbar.ProxyReader(body)
 
-	req, err = http.NewRequest("POST", uploadUrl, body)
-	req.Header.Add("Content-Length", chunkSizeStr)
-	req.Header.Add("X-Goog-Upload-Command", "upload")
-	req.Header.Add("X-Goog-Upload-Offset", strconv.Itoa(int(numBytes)))
+	req, err = http.NewRequest("POST", uploadUrl, s)
+	req.Header.Set("Content-Length", strconv.Itoa(int(numBytes)))
+	req.Header.Set("X-Goog-Upload-Command", "upload")
+	req.Header.Set("X-Goog-Upload-Offset", strconv.Itoa((numChunks-1)*chunkSize))
 	resp, err = client.Do(req)
 
 	defer resp.Body.Close()
@@ -298,7 +306,9 @@ func simpleUploadToken(client *http.Client, filename string) string {
 		log.Fatalf("Cannot open a file %v", err)
 	}
 
-	req, err := http.NewRequest("POST", fmt.Sprintf("%s/%s/uploads", basePath, apiVer), file)
+	wrappedReader := pbar.ProxyReader(file)
+
+	req, err := http.NewRequest("POST", fmt.Sprintf("%s/%s/uploads", basePath, apiVer), wrappedReader)
 	if err != nil {
 		log.Fatal(err)
 	}

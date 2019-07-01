@@ -130,7 +130,7 @@ var pullCmd = &cobra.Command{
 		}
 
 		currTotal := int64(len(resp.MediaItems))
-		p, pbar = progressbar.Make(currTotal, "Downloading Files: ")
+		p, pbar = progressbar.MakeCount(currTotal, "Downloading Files: ")
 
 		var feedWg sync.WaitGroup
 
